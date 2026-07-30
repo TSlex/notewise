@@ -6,6 +6,11 @@ type ActiveVoice = {
 export class AudioEngine {
   private context: AudioContext | null = null;
   private voices = new Map<number, ActiveVoice>();
+  private volume = 0.65;
+
+  setVolume(volume: number) {
+    this.volume = Math.max(0, Math.min(1, volume));
+  }
 
   async activate() {
     if (!this.context) {
@@ -27,8 +32,10 @@ export class AudioEngine {
     oscillator.type = "triangle";
     oscillator.frequency.value = 440 * 2 ** ((midiNote - 69) / 12);
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.2, now + 0.018);
-    gain.gain.exponentialRampToValueAtTime(0.12, now + 0.11);
+    const peak = Math.max(0.0001, 0.28 * this.volume);
+    const sustain = Math.max(0.0001, 0.16 * this.volume);
+    gain.gain.exponentialRampToValueAtTime(peak, now + 0.018);
+    gain.gain.exponentialRampToValueAtTime(sustain, now + 0.11);
 
     oscillator.connect(gain);
     gain.connect(this.context.destination);

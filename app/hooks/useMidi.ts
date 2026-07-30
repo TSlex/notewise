@@ -2,21 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type MidiInputLike = {
-  id: string;
-  name?: string | null;
-  manufacturer?: string | null;
-  state: "connected" | "disconnected";
-  onmidimessage: ((event: { data: Uint8Array }) => void) | null;
-};
-
-type MidiAccessLike = {
-  inputs: Map<string, MidiInputLike>;
-  onstatechange: (() => void) | null;
-};
-
 type NavigatorWithMidi = Navigator & {
-  requestMIDIAccess?: () => Promise<MidiAccessLike>;
+  requestMIDIAccess?: () => Promise<MIDIAccess>;
 };
 
 export type MidiStatus =
@@ -32,7 +19,7 @@ export function useMidi(
 ) {
   const [status, setStatus] = useState<MidiStatus>("connecting");
   const [deviceName, setDeviceName] = useState("");
-  const accessRef = useRef<MidiAccessLike | null>(null);
+  const accessRef = useRef<MIDIAccess | null>(null);
   const activeNotesRef = useRef(new Set<number>());
   const noteOnRef = useRef(onNoteOn);
   const noteOffRef = useRef(onNoteOff);
@@ -42,13 +29,14 @@ export function useMidi(
     noteOffRef.current = onNoteOff;
   }, [onNoteOn, onNoteOff]);
 
-  const bindInputs = useCallback((access: MidiAccessLike) => {
+  const bindInputs = useCallback((access: MIDIAccess) => {
     const connectedInputs = Array.from(access.inputs.values()).filter(
       (input) => input.state === "connected",
     );
 
     for (const input of connectedInputs) {
       input.onmidimessage = ({ data }) => {
+        if (!data || data.length < 2) return;
         const command = data[0] & 0xf0;
         const midiNote = data[1];
         const velocity = data[2] ?? 0;

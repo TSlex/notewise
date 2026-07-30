@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type {
   ClefMode,
+  PracticeMode,
   RangePreset,
   SessionLength,
+  ThemeMode,
   TrainerSettings,
 } from "../trainers/types";
 
@@ -14,12 +16,22 @@ type SettingsMenuProps = {
   onClose: () => void;
 };
 
-const rows = ["clef", "range", "length", "sound"] as const;
+const rows = [
+  "mode",
+  "clef",
+  "range",
+  "length",
+  "theme",
+  "sound",
+  "volume",
+] as const;
 type Row = (typeof rows)[number];
 
+const MODES: PracticeMode[] = ["study", "flow"];
 const CLEFS: ClefMode[] = ["treble", "bass", "mixed"];
 const RANGES: RangePreset[] = ["octave", "octave-half", "two-octaves"];
 const LENGTHS: SessionLength[] = [10, 20, "endless"];
+const THEMES: ThemeMode[] = ["dark", "light"];
 
 const clefLabels: Record<ClefMode, string> = {
   treble: "Скрипичный",
@@ -44,33 +56,61 @@ export function SettingsMenu({
 }: SettingsMenuProps) {
   const [activeRow, setActiveRow] = useState(0);
 
-  const cycleRow = (row: Row, direction: number) => {
-    if (row === "clef") {
-      onChange({
-        ...settings,
-        clefMode: nextValue(CLEFS, settings.clefMode, direction),
-      });
-    }
-    if (row === "range") {
-      onChange({
-        ...settings,
-        range: nextValue(RANGES, settings.range, direction),
-      });
-    }
-    if (row === "length") {
-      onChange({
-        ...settings,
-        sessionLength: nextValue(
-          LENGTHS,
-          settings.sessionLength,
-          direction,
-        ),
-      });
-    }
-    if (row === "sound") {
-      onChange({ ...settings, soundEnabled: !settings.soundEnabled });
-    }
-  };
+  const cycleRow = useCallback(
+    (row: Row, direction: number) => {
+      if (row === "mode") {
+        onChange({
+          ...settings,
+          practiceMode: nextValue(
+            MODES,
+            settings.practiceMode,
+            direction,
+          ),
+        });
+      }
+      if (row === "clef") {
+        onChange({
+          ...settings,
+          clefMode: nextValue(CLEFS, settings.clefMode, direction),
+        });
+      }
+      if (row === "range") {
+        onChange({
+          ...settings,
+          range: nextValue(RANGES, settings.range, direction),
+        });
+      }
+      if (row === "length") {
+        onChange({
+          ...settings,
+          sessionLength: nextValue(
+            LENGTHS,
+            settings.sessionLength,
+            direction,
+          ),
+        });
+      }
+      if (row === "theme") {
+        onChange({
+          ...settings,
+          theme: nextValue(THEMES, settings.theme, direction),
+        });
+      }
+      if (row === "sound") {
+        onChange({ ...settings, soundEnabled: !settings.soundEnabled });
+      }
+      if (row === "volume") {
+        onChange({
+          ...settings,
+          volume: Math.max(
+            0,
+            Math.min(1, Math.round((settings.volume + direction * 0.1) * 10) / 10),
+          ),
+        });
+      }
+    },
+    [onChange, settings],
+  );
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -102,9 +142,17 @@ export function SettingsMenu({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  });
+  }, [activeRow, cycleRow, onClose]);
 
   const menuRows = [
+    {
+      id: "mode" as const,
+      label: "Режим",
+      value:
+        settings.practiceMode === "flow"
+          ? "Чтение на скорость"
+          : "Чтение нот",
+    },
     {
       id: "clef" as const,
       label: "Ключ",
@@ -124,9 +172,19 @@ export function SettingsMenu({
           : `${settings.sessionLength} нот`,
     },
     {
+      id: "theme" as const,
+      label: "Тема",
+      value: settings.theme === "light" ? "Светлая" : "Тёмная",
+    },
+    {
       id: "sound" as const,
       label: "Звук приложения",
       value: settings.soundEnabled ? "Включён" : "Выключен",
+    },
+    {
+      id: "volume" as const,
+      label: "Громкость",
+      value: `${Math.round(settings.volume * 100)}%`,
     },
   ];
 
@@ -166,7 +224,8 @@ export function SettingsMenu({
               </button>
             ))}
             <p className="setting-note">
-              Изменения применяются к следующей ноте и начинают новую серию.
+              Режим, ключ и диапазон начинают новую сессию. Тема, звук и
+              громкость меняются сразу.
             </p>
           </div>
 
@@ -195,11 +254,23 @@ export function SettingsMenu({
               </div>
               <div>
                 <dt>R</dt>
-                <dd>Новая серия</dd>
+                <dd>Завершить и начать заново</dd>
+              </div>
+              <div>
+                <dt>M</dt>
+                <dd>Сменить режим</dd>
+              </div>
+              <div>
+                <dt>T</dt>
+                <dd>Сменить тему</dd>
               </div>
               <div>
                 <dt>S</dt>
                 <dd>Включить / выключить звук</dd>
+              </div>
+              <div>
+                <dt>− +</dt>
+                <dd>Громкость</dd>
               </div>
             </dl>
           </div>

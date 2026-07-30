@@ -2,12 +2,17 @@ export type Clef = "treble" | "bass";
 export type ClefMode = Clef | "mixed";
 export type RangePreset = "octave" | "octave-half" | "two-octaves";
 export type SessionLength = 10 | 20 | "endless";
+export type PracticeMode = "study" | "flow";
+export type ThemeMode = "dark" | "light";
 
 export type TrainerSettings = {
+  practiceMode: PracticeMode;
   clefMode: ClefMode;
   range: RangePreset;
   sessionLength: SessionLength;
   soundEnabled: boolean;
+  volume: number;
+  theme: ThemeMode;
 };
 
 export type NoteQuestion = {

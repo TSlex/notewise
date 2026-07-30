@@ -32,17 +32,25 @@ test("server-renders the Notewise practice shell", async () => {
   assert.match(html, /<title>Notewise — MIDI-тренажёр нот<\/title>/i);
   assert.match(html, /notewise/i);
   assert.match(html, /Чтение нот/);
+  assert.match(html, /Сессии/);
+  assert.match(html, /Точность/);
   assert.match(html, /Подключить MIDI|Ищем MIDI/);
   assert.match(html, /Экранная клавиатура/);
+  assert.match(html, /property="og:image"/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
-test("keeps MIDI, audio, trainer logic, and UI in separate modules", async () => {
-  const [midi, audio, trainer, app, packageJson] = await Promise.all([
+test("keeps the new training capabilities in separate modules", async () => {
+  const [midi, audio, trainer, app, flow, history, settings, css, packageJson] =
+    await Promise.all([
     readFile(new URL("../app/hooks/useMidi.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/audioEngine.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/trainers/noteReading.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/PracticeApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/FlowStaff.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/sessionHistory.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/SettingsMenu.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
@@ -51,12 +59,22 @@ test("keeps MIDI, audio, trainer logic, and UI in separate modules", async () =>
   assert.match(midi, /command === 0x80/);
   assert.match(audio, /AudioContext/);
   assert.match(audio, /oscillator\.frequency/);
+  assert.match(audio, /setVolume/);
   assert.match(trainer, /createQuestion/);
   assert.match(trainer, /isCorrect/);
   assert.match(app, /nextAttempt === 2/);
-  assert.match(app, /scheduleNext\(480/);
+  assert.match(app, /MIN_FLOW_DURATION/);
+  assert.match(app, /MAX_FLOW_DURATION/);
+  assert.match(app, /delay:\s*480/);
+  assert.match(flow, /requestAnimationFrame/);
+  assert.match(flow, /onTimeout/);
+  assert.match(history, /localStorage/);
+  assert.match(settings, /Чтение на скорость/);
+  assert.match(settings, /Громкость/);
+  assert.match(css, /html\[data-theme="light"\]/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 
+  await access(new URL("../public/og.png", import.meta.url));
   await assert.rejects(
     access(new URL("../app/_sites-preview/", import.meta.url)),
   );
