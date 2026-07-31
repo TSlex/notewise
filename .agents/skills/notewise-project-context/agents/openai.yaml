@@ -1,0 +1,4 @@
+interface:
+  display_name: "Notewise Project Context"
+  short_description: "Keeps Notewise project handoff current"
+  default_prompt: "Use $notewise-project-context to continue work on Notewise."
