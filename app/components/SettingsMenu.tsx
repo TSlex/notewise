@@ -1,277 +1,158 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
+import type { MidiDevice } from "../hooks/useMidi";
+import { KEY_SIGNATURES } from "../trainers/noteReading";
 import type {
   ClefMode,
+  KeySignature,
   PracticeMode,
   RangePreset,
   SessionLength,
-  ThemeMode,
   TrainerSettings,
 } from "../trainers/types";
 
 type SettingsMenuProps = {
   settings: TrainerSettings;
+  midiDevices: MidiDevice[];
   onChange: (settings: TrainerSettings) => void;
   onClose: () => void;
 };
 
-const rows = [
-  "mode",
-  "clef",
-  "range",
-  "length",
-  "theme",
-  "sound",
-  "volume",
-] as const;
-type Row = (typeof rows)[number];
+const KEY_OPTIONS = Object.entries(KEY_SIGNATURES) as Array<
+  [KeySignature, { label: string; fifths: number }]
+>;
 
-const MODES: PracticeMode[] = ["study", "flow"];
-const CLEFS: ClefMode[] = ["treble", "bass", "mixed"];
-const RANGES: RangePreset[] = ["octave", "octave-half", "two-octaves"];
-const LENGTHS: SessionLength[] = [10, 20, "endless"];
-const THEMES: ThemeMode[] = ["dark", "light"];
-
-const clefLabels: Record<ClefMode, string> = {
-  treble: "Скрипичный",
-  bass: "Басовый",
-  mixed: "Вперемешку",
-};
-const rangeLabels: Record<RangePreset, string> = {
-  octave: "1 октава",
-  "octave-half": "1½ октавы",
-  "two-octaves": "2 октавы",
-};
-
-function nextValue<T>(values: T[], current: T, direction: number) {
-  const currentIndex = values.indexOf(current);
-  return values[(currentIndex + direction + values.length) % values.length];
+function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`switch-control ${checked ? "is-on" : ""}`}
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+    >
+      <span />
+      {label}
+    </button>
+  );
 }
 
-export function SettingsMenu({
-  settings,
-  onChange,
-  onClose,
-}: SettingsMenuProps) {
-  const [activeRow, setActiveRow] = useState(0);
-
-  const cycleRow = useCallback(
-    (row: Row, direction: number) => {
-      if (row === "mode") {
-        onChange({
-          ...settings,
-          practiceMode: nextValue(
-            MODES,
-            settings.practiceMode,
-            direction,
-          ),
-        });
-      }
-      if (row === "clef") {
-        onChange({
-          ...settings,
-          clefMode: nextValue(CLEFS, settings.clefMode, direction),
-        });
-      }
-      if (row === "range") {
-        onChange({
-          ...settings,
-          range: nextValue(RANGES, settings.range, direction),
-        });
-      }
-      if (row === "length") {
-        onChange({
-          ...settings,
-          sessionLength: nextValue(
-            LENGTHS,
-            settings.sessionLength,
-            direction,
-          ),
-        });
-      }
-      if (row === "theme") {
-        onChange({
-          ...settings,
-          theme: nextValue(THEMES, settings.theme, direction),
-        });
-      }
-      if (row === "sound") {
-        onChange({ ...settings, soundEnabled: !settings.soundEnabled });
-      }
-      if (row === "volume") {
-        onChange({
-          ...settings,
-          volume: Math.max(
-            0,
-            Math.min(1, Math.round((settings.volume + direction * 0.1) * 10) / 10),
-          ),
-        });
-      }
-    },
-    [onChange, settings],
-  );
-
+export function SettingsMenu({ settings, midiDevices, onChange, onClose }: SettingsMenuProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();
       }
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        setActiveRow((row) => (row + 1) % rows.length);
-      }
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        setActiveRow((row) => (row - 1 + rows.length) % rows.length);
-      }
-      if (event.key === "ArrowRight") {
-        event.preventDefault();
-        cycleRow(rows[activeRow], 1);
-      }
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        cycleRow(rows[activeRow], -1);
-      }
-      if (event.key === "Enter") {
-        event.preventDefault();
-        onClose();
-      }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeRow, cycleRow, onClose]);
+  }, [onClose]);
 
-  const menuRows = [
-    {
-      id: "mode" as const,
-      label: "Режим",
-      value:
-        settings.practiceMode === "flow"
-          ? "Чтение на скорость"
-          : "Чтение нот",
-    },
-    {
-      id: "clef" as const,
-      label: "Ключ",
-      value: clefLabels[settings.clefMode],
-    },
-    {
-      id: "range" as const,
-      label: "Диапазон",
-      value: rangeLabels[settings.range],
-    },
-    {
-      id: "length" as const,
-      label: "Серия",
-      value:
-        settings.sessionLength === "endless"
-          ? "Без конца"
-          : `${settings.sessionLength} нот`,
-    },
-    {
-      id: "theme" as const,
-      label: "Тема",
-      value: settings.theme === "light" ? "Светлая" : "Тёмная",
-    },
-    {
-      id: "sound" as const,
-      label: "Звук приложения",
-      value: settings.soundEnabled ? "Включён" : "Выключен",
-    },
-    {
-      id: "volume" as const,
-      label: "Громкость",
-      value: `${Math.round(settings.volume * 100)}%`,
-    },
-  ];
+  const set = <K extends keyof TrainerSettings>(key: K, value: TrainerSettings[K]) => {
+    onChange({ ...settings, [key]: value });
+  };
 
   return (
     <div className="settings-backdrop" role="presentation">
-      <section
-        className="settings-menu"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-title"
-      >
+      <section className="settings-menu" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <div className="settings-heading">
           <div>
             <p className="eyebrow">Пауза</p>
             <h2 id="settings-title">Настройки тренировки</h2>
           </div>
-          <button className="key-button" onClick={onClose} aria-label="Закрыть">
-            Esc
-          </button>
+          <button className="key-button" onClick={onClose} aria-label="Закрыть">Esc</button>
         </div>
 
         <div className="settings-grid">
           <div className="setting-list">
-            {menuRows.map((row, index) => (
-              <button
-                className={`setting-row ${activeRow === index ? "is-selected" : ""}`}
-                key={row.id}
-                onMouseEnter={() => setActiveRow(index)}
-                onClick={() => cycleRow(row.id, 1)}
-              >
-                <span>{row.label}</span>
-                <strong>
-                  <span className="setting-arrow">‹</span>
-                  {row.value}
-                  <span className="setting-arrow">›</span>
-                </strong>
-              </button>
-            ))}
-            <p className="setting-note">
-              Режим, ключ и диапазон начинают новую сессию. Тема, звук и
-              громкость меняются сразу.
-            </p>
+            <label className="setting-row">
+              <span>Режим</span>
+              <select value={settings.practiceMode} onChange={(event) => set("practiceMode", event.target.value as PracticeMode)}>
+                <option value="study">Чтение нот</option>
+                <option value="flow">Чтение на скорость</option>
+              </select>
+            </label>
+            <label className="setting-row">
+              <span>Ключ</span>
+              <select value={settings.clefMode} onChange={(event) => set("clefMode", event.target.value as ClefMode)}>
+                <option value="treble">Скрипичный</option>
+                <option value="bass">Басовый</option>
+                <option value="mixed">Вперемешку</option>
+              </select>
+            </label>
+            <label className="setting-row">
+              <span>Тональность</span>
+              <select value={settings.keySignature} onChange={(event) => set("keySignature", event.target.value as KeySignature)}>
+                <optgroup label="Мажор">
+                  {KEY_OPTIONS.filter(([key]) => !key.endsWith("m")).map(([key, item]) => <option value={key} key={key}>{item.label}</option>)}
+                </optgroup>
+                <optgroup label="Минор">
+                  {KEY_OPTIONS.filter(([key]) => key.endsWith("m")).map(([key, item]) => <option value={key} key={key}>{item.label}</option>)}
+                </optgroup>
+              </select>
+            </label>
+            <div className="setting-row">
+              <span>Альтерации вне тональности</span>
+              <Toggle checked={settings.accidentalsEnabled} label={settings.accidentalsEnabled ? "Включены" : "Выключены"} onChange={() => set("accidentalsEnabled", !settings.accidentalsEnabled)} />
+            </div>
+            <label className="setting-row">
+              <span>Диапазон</span>
+              <select value={settings.range} onChange={(event) => set("range", event.target.value as RangePreset)}>
+                <option value="octave">1 октава</option>
+                <option value="octave-half">1½ октавы</option>
+                <option value="two-octaves">2 октавы</option>
+              </select>
+            </label>
+            <label className="setting-row">
+              <span>Серия</span>
+              <select value={String(settings.sessionLength)} onChange={(event) => set("sessionLength", event.target.value === "endless" ? "endless" : Number(event.target.value) as SessionLength)}>
+                <option value="10">10 нот</option>
+                <option value="20">20 нот</option>
+                <option value="endless">Без конца</option>
+              </select>
+            </label>
+            <label className="setting-row">
+              <span>MIDI-вход</span>
+              <select value={settings.midiInputId} onChange={(event) => set("midiInputId", event.target.value)}>
+                <option value="">Автоматически</option>
+                {midiDevices.map((device) => <option value={device.id} key={device.id}>{device.name}</option>)}
+              </select>
+            </label>
+            <div className="setting-row">
+              <span>Звук приложения</span>
+              <Toggle checked={settings.soundEnabled} label={settings.soundEnabled ? "Включён" : "Выключен"} onChange={() => set("soundEnabled", !settings.soundEnabled)} />
+            </div>
+            <label className="setting-row setting-slider">
+              <span>Громкость <strong>{Math.round(settings.volume * 100)}%</strong></span>
+              <input aria-label="Громкость" type="range" min="0" max="100" step="5" value={Math.round(settings.volume * 100)} onChange={(event) => set("volume", Number(event.target.value) / 100)} />
+            </label>
+            <div className="setting-row">
+              <span>Метроном</span>
+              <Toggle checked={settings.metronomeEnabled} label={settings.metronomeEnabled ? "Слышен" : "Без звука"} onChange={() => set("metronomeEnabled", !settings.metronomeEnabled)} />
+            </div>
+            <label className="setting-row setting-slider">
+              <span>Стартовый темп <strong>{settings.flowBpm} BPM</strong></span>
+              <input aria-label="Стартовый темп" type="range" min="40" max="200" step="4" value={settings.flowBpm} onChange={(event) => set("flowBpm", Number(event.target.value))} />
+            </label>
+            <div className="setting-row">
+              <span>Светлая тема</span>
+              <Toggle checked={settings.theme === "light"} label={settings.theme === "light" ? "Включена" : "Выключена"} onChange={() => set("theme", settings.theme === "light" ? "dark" : "light")} />
+            </div>
+            <p className="setting-note">Параметры упражнения начинают новую сессию только после первого сыгранного задания. Звук, MIDI и тема меняются сразу.</p>
           </div>
 
           <div className="shortcuts">
             <p className="eyebrow">Управление</p>
             <dl>
-              <div>
-                <dt>Esc</dt>
-                <dd>Настройки / закрыть</dd>
-              </div>
-              <div>
-                <dt>Space</dt>
-                <dd>Пауза / продолжить</dd>
-              </div>
-              <div>
-                <dt>↑ ↓</dt>
-                <dd>Выбрать настройку</dd>
-              </div>
-              <div>
-                <dt>← →</dt>
-                <dd>Изменить значение</dd>
-              </div>
-              <div>
-                <dt>Enter</dt>
-                <dd>Применить и продолжить</dd>
-              </div>
-              <div>
-                <dt>R</dt>
-                <dd>Завершить и начать заново</dd>
-              </div>
-              <div>
-                <dt>M</dt>
-                <dd>Сменить режим</dd>
-              </div>
-              <div>
-                <dt>T</dt>
-                <dd>Сменить тему</dd>
-              </div>
-              <div>
-                <dt>S</dt>
-                <dd>Включить / выключить звук</dd>
-              </div>
-              <div>
-                <dt>− +</dt>
-                <dd>Громкость</dd>
-              </div>
+              <div><dt>Esc</dt><dd>Настройки / закрыть</dd></div>
+              <div><dt>Space</dt><dd>Пауза / продолжить</dd></div>
+              <div><dt>R</dt><dd>Новая сессия</dd></div>
+              <div><dt>M</dt><dd>Сменить режим</dd></div>
+              <div><dt>T</dt><dd>Сменить тему</dd></div>
+              <div><dt>S</dt><dd>Включить / выключить звук</dd></div>
+              <div><dt>− +</dt><dd>Громкость</dd></div>
             </dl>
           </div>
         </div>

@@ -40,8 +40,8 @@ test("server-renders the Notewise practice shell", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
-test("keeps the new training capabilities in separate modules", async () => {
-  const [midi, audio, trainer, app, flow, history, settings, css, packageJson] =
+test("keeps the training capabilities in separate modules", async () => {
+  const [midi, audio, trainer, app, flow, history, settings, notation, launcher, css, packageJson] =
     await Promise.all([
     readFile(new URL("../app/hooks/useMidi.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/audioEngine.ts", import.meta.url), "utf8"),
@@ -50,6 +50,8 @@ test("keeps the new training capabilities in separate modules", async () => {
     readFile(new URL("../app/components/FlowStaff.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/sessionHistory.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/SettingsMenu.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/drawNotation.ts", import.meta.url), "utf8"),
+    readFile(new URL("../notewise-local.bat", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
@@ -57,20 +59,39 @@ test("keeps the new training capabilities in separate modules", async () => {
   assert.match(midi, /requestMIDIAccess/);
   assert.match(midi, /command === 0x90/);
   assert.match(midi, /command === 0x80/);
+  assert.match(midi, /selectedInputId/);
+  assert.match(midi, /setDevices/);
   assert.match(audio, /AudioContext/);
   assert.match(audio, /oscillator\.frequency/);
   assert.match(audio, /setVolume/);
+  assert.match(audio, /pendingNotes/);
+  assert.match(audio, /metronomeTick/);
   assert.match(trainer, /createQuestion/);
   assert.match(trainer, /isCorrect/);
+  assert.match(trainer, /KEY_SIGNATURES/);
+  assert.match(trainer, /displayAccidental/);
   assert.match(app, /nextAttempt === 2/);
-  assert.match(app, /MIN_FLOW_DURATION/);
-  assert.match(app, /MAX_FLOW_DURATION/);
+  assert.match(app, /MIN_FLOW_BPM/);
+  assert.match(app, /MAX_FLOW_BPM/);
+  assert.match(app, /flowWindowRef\.current\.length === 5/);
+  assert.match(app, /hydratedRef\.current/);
   assert.match(app, /delay:\s*480/);
   assert.match(flow, /requestAnimationFrame/);
   assert.match(flow, /onTimeout/);
+  assert.match(flow, /questions\.slice\(0, 5\)/);
+  assert.doesNotMatch(flow, /const settled/);
   assert.match(history, /localStorage/);
+  assert.match(history, /MAX_SESSIONS = 20/);
+  assert.match(history, /notewise\.session-count\.v1/);
   assert.match(settings, /Чтение на скорость/);
   assert.match(settings, /Громкость/);
+  assert.match(settings, /<select/);
+  assert.match(settings, /Альтерации вне тональности/);
+  assert.match(settings, /MIDI-вход/);
+  assert.match(notation, /KEY_SIGNATURES/);
+  assert.match(notation, /displayAccidental/);
+  assert.match(launcher, /3000\.\.3010/);
+  assert.match(launcher, /PORT_FILE/);
   assert.match(css, /html\[data-theme="light"\]/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 

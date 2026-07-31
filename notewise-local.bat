@@ -4,6 +4,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 set "APP_DIR=%~dp0"
 set "SERVER_SCRIPT=%APP_DIR%notewise-local-server.bat"
 set "PID_FILE=%APP_DIR%.notewise-local.pid"
+set "PORT_FILE=%APP_DIR%.notewise-local.port"
 set "LOG_FILE=%APP_DIR%notewise-local.log"
 
 if /I "%~1"=="start" (
@@ -19,7 +20,8 @@ if /I "%~1"=="status" (
   exit /b !ERRORLEVEL!
 )
 if /I "%~1"=="open" (
-  start "" "http://127.0.0.1:3000"
+  call :load_port
+  start "" "http://127.0.0.1:!APP_PORT!"
   exit /b 0
 )
 if not "%~1"=="" (
@@ -29,10 +31,11 @@ if not "%~1"=="" (
 )
 
 :menu
+call :load_port
 cls
 echo.
 echo   Notewise — local launcher
-echo   http://127.0.0.1:3000
+echo   http://127.0.0.1:!APP_PORT!
 echo.
 echo   [1] Start
 echo   [2] Stop
@@ -43,7 +46,8 @@ echo.
 choice /c 12345 /n /m "Choose an action"
 if errorlevel 5 exit /b 0
 if errorlevel 4 (
-  start "" "http://127.0.0.1:3000"
+  call :load_port
+  start "" "http://127.0.0.1:!APP_PORT!"
   goto menu
 )
 if errorlevel 3 (
@@ -65,7 +69,8 @@ if errorlevel 1 (
 :start
 call :get_running_pid
 if defined RUNNING_PID (
-  echo Notewise is already running at http://127.0.0.1:3000
+  call :load_port
+  echo Notewise is already running at http://127.0.0.1:!APP_PORT!
   exit /b 0
 )
 
@@ -80,8 +85,16 @@ if not exist "%SERVER_SCRIPT%" (
   exit /b 1
 )
 
+call :find_port
+if not defined APP_PORT (
+  echo Could not find a free local port between 3000 and 3010.
+  exit /b 1
+)
+>"%PORT_FILE%" echo !APP_PORT!
+if not "!APP_PORT!"=="3000" echo Port 3000 is busy. Notewise will use port !APP_PORT!.
+
 del "%PID_FILE%" >nul 2>&1
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$server = '%SERVER_SCRIPT%'; $log = '%LOG_FILE%'; $quote = [char]34; $command = 'call ' + $quote + $server + $quote + ' ^> ' + $quote + $log + $quote + ' 2^>^&1'; $process = Start-Process -FilePath $env:ComSpec -ArgumentList '/d','/c',$command -WorkingDirectory '%APP_DIR%' -WindowStyle Hidden -PassThru; Set-Content -LiteralPath '%PID_FILE%' -Value $process.Id -NoNewline"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$server = '%SERVER_SCRIPT%'; $log = '%LOG_FILE%'; $quote = [char]34; $command = 'call ' + $quote + $server + $quote + ' !APP_PORT! ^> ' + $quote + $log + $quote + ' 2^>^&1'; $process = Start-Process -FilePath $env:ComSpec -ArgumentList '/d','/c',$command -WorkingDirectory '%APP_DIR%' -WindowStyle Hidden -PassThru; Set-Content -LiteralPath '%PID_FILE%' -Value $process.Id -NoNewline"
 if errorlevel 1 (
   echo Could not start the local server.
   exit /b 1
@@ -90,11 +103,12 @@ if errorlevel 1 (
 timeout /t 2 /nobreak >nul
 call :get_running_pid
 if not defined RUNNING_PID (
+  del "%PORT_FILE%" >nul 2>&1
   echo The server stopped during startup. See notewise-local.log for details.
   exit /b 1
 )
 
-start "" "http://127.0.0.1:3000"
+start "" "http://127.0.0.1:!APP_PORT!"
 echo Notewise is running locally. This window can now be closed.
 exit /b 0
 
@@ -103,6 +117,7 @@ call :get_running_pid
 if not defined RUNNING_PID (
   echo Notewise is not running locally.
   del "%PID_FILE%" >nul 2>&1
+  del "%PORT_FILE%" >nul 2>&1
   exit /b 0
 )
 
@@ -113,13 +128,15 @@ if errorlevel 1 (
 )
 
 del "%PID_FILE%" >nul 2>&1
+del "%PORT_FILE%" >nul 2>&1
 echo Notewise has stopped.
 exit /b 0
 
 :status
 call :get_running_pid
 if defined RUNNING_PID (
-  echo Notewise is running locally at http://127.0.0.1:3000
+  call :load_port
+  echo Notewise is running locally at http://127.0.0.1:!APP_PORT!
   exit /b 0
 )
 
@@ -137,4 +154,14 @@ powershell -NoProfile -Command "$process = Get-CimInstance Win32_Process -Filter
 if errorlevel 1 exit /b 1
 
 set "RUNNING_PID=%CANDIDATE_PID%"
+exit /b 0
+
+:load_port
+set "APP_PORT=3000"
+if exist "%PORT_FILE%" set /p "APP_PORT="<"%PORT_FILE%"
+exit /b 0
+
+:find_port
+set "APP_PORT="
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$used = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners().Port; 3000..3010 | Where-Object { $_ -notin $used } | Select-Object -First 1"`) do set "APP_PORT=%%P"
 exit /b 0

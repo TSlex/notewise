@@ -1,12 +1,15 @@
-import { getDiatonicIndex } from "../trainers/noteReading";
+import { getDiatonicIndex, KEY_SIGNATURES } from "../trainers/noteReading";
 import type { NoteQuestion } from "../trainers/types";
 
 export type NotationState = "waiting" | "correct" | "wrong" | "revealed";
 
-const CLEF_BOTTOM_LINE_MIDI = {
-  treble: 64,
-  bass: 43,
+const CLEF_BOTTOM_LINE = {
+  treble: { letterIndex: 2, octave: 4 },
+  bass: { letterIndex: 4, octave: 2 },
 } as const;
+
+const SHARP_STEPS = { treble: [8, 5, 9, 6, 3, 7, 4], bass: [6, 3, 7, 4, 1, 5, 2] };
+const FLAT_STEPS = { treble: [4, 7, 3, 6, 2, 5, 1], bass: [2, 5, 1, 4, 0, 3, -1] };
 
 function cssColor(name: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
@@ -44,6 +47,7 @@ export function drawNotation(
   question: NoteQuestion,
   state: NotationState,
   progress?: number,
+  options: { flowIndex?: number; notationOnly?: boolean } = {},
 ) {
   const text = cssColor("--text", "#f5f4ef");
   const lineColor = cssColor("--staff-line", "rgba(245, 244, 239, 0.64)");
@@ -57,25 +61,28 @@ export function drawNotation(
   const spacing = 18;
   const topLine = 76;
   const bottomLine = topLine + spacing * 4;
-  const staffLeft = Math.max(78, width * 0.09);
-  const staffRight = width - Math.max(38, width * 0.05);
-  const fixedNoteX = staffLeft + (staffRight - staffLeft) * 0.62;
-  const flowStartX = staffLeft + 104;
-  const finishLineX = staffLeft + (staffRight - staffLeft) * 0.84;
+  const staffMargin = Math.max(48, width * 0.055);
+  const staffLeft = staffMargin;
+  const staffRight = width - staffMargin;
+  const fixedNoteX = width / 2;
+  const finishLineX = staffLeft + Math.max(122, width * 0.16);
+  const flowIndex = options.flowIndex ?? 0;
+  const flowSpacing = Math.min(135, (staffRight - finishLineX) / 4.2);
   const noteX =
     progress === undefined
       ? fixedNoteX
-      : flowStartX + (finishLineX - flowStartX) * Math.min(progress, 1);
+      : finishLineX + (1 - Math.min(progress, 1) + flowIndex) * flowSpacing;
 
-  context.strokeStyle = lineColor;
-  context.lineWidth = 1.25;
-  for (let line = 0; line < 5; line += 1) {
-    const y = topLine + line * spacing;
-    context.beginPath();
-    context.moveTo(staffLeft, y);
-    context.lineTo(staffRight, y);
-    context.stroke();
-  }
+  if (!options.notationOnly) {
+    context.strokeStyle = lineColor;
+    context.lineWidth = 1.25;
+    for (let line = 0; line < 5; line += 1) {
+      const y = topLine + line * spacing;
+      context.beginPath();
+      context.moveTo(staffLeft, y);
+      context.lineTo(staffRight, y);
+      context.stroke();
+    }
 
   if (progress !== undefined) {
     context.save();
@@ -102,8 +109,23 @@ export function drawNotation(
     question.clef === "treble" ? topLine + 36 : topLine + 35,
   );
 
-  const baseIndex = getDiatonicIndex(CLEF_BOTTOM_LINE_MIDI[question.clef]);
-  const noteIndex = getDiatonicIndex(question.midiNote);
+  const fifths = KEY_SIGNATURES[question.keySignature].fifths;
+  if (fifths !== 0) {
+    const symbols = fifths > 0 ? SHARP_STEPS[question.clef] : FLAT_STEPS[question.clef];
+    context.font = "28px 'Segoe UI Symbol', serif";
+    context.textAlign = "center";
+    for (let index = 0; index < Math.abs(fifths); index += 1) {
+      context.fillText(
+        fifths > 0 ? "♯" : "♭",
+        staffLeft + 82 + index * 16,
+        bottomLine - symbols[index] * (spacing / 2),
+      );
+    }
+  }
+  }
+
+  const baseIndex = getDiatonicIndex(CLEF_BOTTOM_LINE[question.clef]);
+  const noteIndex = getDiatonicIndex(question);
   const noteY = bottomLine - (noteIndex - baseIndex) * (spacing / 2);
 
   context.strokeStyle = lineColor;
@@ -145,4 +167,12 @@ export function drawNotation(
     context.lineTo(noteX + 10, noteY - 55);
   }
   context.stroke();
+
+  if (question.displayAccidental) {
+    context.fillStyle = ink;
+    context.font = "29px 'Segoe UI Symbol', serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(question.displayAccidental, noteX - 29, noteY + 1);
+  }
 }

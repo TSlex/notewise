@@ -38,7 +38,9 @@ yarn-error.log*
 next-env.d.ts
 *.tsbuildinfo
 /.notewise-local.pid
+/.notewise-local.port
 /notewise-local.log
+/.codex-dev*.log
 /dist/
 /.wrangler/
 /outputs/

@@ -9,19 +9,19 @@ import {
 import type { NoteQuestion, ThemeMode } from "../trainers/types";
 
 type FlowStaffProps = {
-  question: NoteQuestion;
+  questions: NoteQuestion[];
   state: NotationState;
   theme: ThemeMode;
-  durationMs: number;
+  bpm: number;
   paused: boolean;
   onTimeout: () => void;
 };
 
 export function FlowStaff({
-  question,
+  questions,
   state,
   theme,
-  durationMs,
+  bpm,
   paused,
   onTimeout,
 }: FlowStaffProps) {
@@ -56,24 +56,25 @@ export function FlowStaff({
         pauseStartedAt = null;
       }
 
-      const settled =
-        stateRef.current === "correct" || stateRef.current === "revealed";
-      if (!pausedRef.current && !settled) {
-        lastProgress = Math.min((now - startedAt) / durationMs, 1);
+      if (!pausedRef.current) {
+        lastProgress = Math.min((now - startedAt) / (60_000 / bpm), 1);
       }
 
       const prepared = prepareCanvas(canvas);
       if (prepared) {
-        drawNotation(
-          prepared.context,
-          prepared.width,
-          question,
-          stateRef.current,
-          lastProgress,
-        );
+        questions.slice(0, 5).forEach((question, index) => {
+          drawNotation(
+            prepared.context,
+            prepared.width,
+            question,
+            index === 0 ? stateRef.current : "waiting",
+            lastProgress,
+            { flowIndex: index, notationOnly: index > 0 },
+          );
+        });
       }
 
-      if (lastProgress >= 1 && !timedOut && !settled) {
+      if (lastProgress >= 1 && !timedOut) {
         timedOut = true;
         timeoutRef.current();
         return;
@@ -86,13 +87,13 @@ export function FlowStaff({
     return () => cancelAnimationFrame(frame);
     // Скорость фиксируется для текущей ноты и меняется со следующего задания.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [question.id]);
+  }, [questions[0]?.id, bpm]);
 
   return (
     <canvas
       ref={canvasRef}
       className="music-staff flow-staff"
-      aria-label={`${question.clef === "treble" ? "Скрипичный" : "Басовый"} ключ, движущаяся нота`}
+      aria-label="Очередь нот движется справа налево в ритме метронома"
     />
   );
 }

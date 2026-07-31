@@ -4,6 +4,7 @@ import type { SessionRecord } from "../lib/sessionHistory";
 
 type SessionHistoryProps = {
   sessions: SessionRecord[];
+  totalSessions: number;
   elapsedSeconds: number;
   currentAccuracy: number;
   currentAnswered: number;
@@ -36,6 +37,7 @@ function formatSessionDate(value: string) {
 
 export function SessionHistory({
   sessions,
+  totalSessions,
   elapsedSeconds,
   currentAccuracy,
   currentAnswered,
@@ -69,8 +71,8 @@ export function SessionHistory({
       </section>
 
       <div className="history-list-heading">
-        <span>Прошлые</span>
-        <span>{sessions.length}</span>
+        <span>Последние {sessions.length}</span>
+        <span>Всего {totalSessions}</span>
       </div>
 
       <div className="history-list">
@@ -106,7 +108,11 @@ export function SessionHistory({
               {session.mode === "flow" && (
                 <p className="history-detail">
                   Пропущено: {session.missed} · финальный темп:{" "}
-                  {(session.finalFlowDurationMs! / 1000).toFixed(1)} с
+                  {session.finalBpm
+                    ? `${session.finalBpm} BPM`
+                    : session.finalFlowDurationMs
+                      ? `${(session.finalFlowDurationMs / 1000).toFixed(1)} с`
+                      : "—"}
                 </p>
               )}
             </article>

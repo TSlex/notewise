@@ -13,28 +13,49 @@ export type MidiStatus =
   | "disconnected"
   | "denied";
 
+export type MidiDevice = { id: string; name: string };
+
 export function useMidi(
   onNoteOn: (midiNote: number, velocity: number) => void,
   onNoteOff: (midiNote: number) => void,
+  selectedInputId = "",
 ) {
   const [status, setStatus] = useState<MidiStatus>("connecting");
   const [deviceName, setDeviceName] = useState("");
+  const [devices, setDevices] = useState<MidiDevice[]>([]);
   const accessRef = useRef<MIDIAccess | null>(null);
   const activeNotesRef = useRef(new Set<number>());
   const noteOnRef = useRef(onNoteOn);
   const noteOffRef = useRef(onNoteOff);
+  const selectedInputRef = useRef(selectedInputId);
+  const bindInputsRef = useRef<(access: MIDIAccess) => void>(() => undefined);
 
   useEffect(() => {
     noteOnRef.current = onNoteOn;
     noteOffRef.current = onNoteOff;
   }, [onNoteOn, onNoteOff]);
 
+  useEffect(() => {
+    selectedInputRef.current = selectedInputId;
+    if (accessRef.current) bindInputsRef.current(accessRef.current);
+  }, [selectedInputId]);
+
   const bindInputs = useCallback((access: MIDIAccess) => {
     const connectedInputs = Array.from(access.inputs.values()).filter(
       (input) => input.state === "connected",
     );
 
-    for (const input of connectedInputs) {
+    const selected = connectedInputs.find((input) => input.id === selectedInputRef.current);
+    const activeInputs = selected ? [selected] : connectedInputs.slice(0, 1);
+
+    for (const input of connectedInputs) input.onmidimessage = null;
+    activeNotesRef.current.clear();
+    setDevices(connectedInputs.map((input) => ({
+      id: input.id,
+      name: input.name || input.manufacturer || "MIDI-клавиатура",
+    })));
+
+    for (const input of activeInputs) {
       input.onmidimessage = ({ data }) => {
         if (!data || data.length < 2) return;
         const command = data[0] & 0xf0;
@@ -55,8 +76,8 @@ export function useMidi(
       };
     }
 
-    if (connectedInputs.length) {
-      const input = connectedInputs[0];
+    if (activeInputs.length) {
+      const input = activeInputs[0];
       setDeviceName(
         input.name || input.manufacturer || "MIDI-клавиатура",
       );
@@ -66,6 +87,10 @@ export function useMidi(
       setStatus("disconnected");
     }
   }, []);
+
+  useEffect(() => {
+    bindInputsRef.current = bindInputs;
+  }, [bindInputs]);
 
   const connect = useCallback(async () => {
     const midiNavigator = navigator as NavigatorWithMidi;
@@ -86,8 +111,9 @@ export function useMidi(
   }, [bindInputs]);
 
   useEffect(() => {
-    void connect();
+    const frame = window.requestAnimationFrame(() => void connect());
     return () => {
+      window.cancelAnimationFrame(frame);
       const access = accessRef.current;
       if (!access) return;
       access.onstatechange = null;
@@ -97,5 +123,5 @@ export function useMidi(
     };
   }, [connect]);
 
-  return { status, deviceName, connect };
+  return { status, deviceName, devices, connect };
 }
