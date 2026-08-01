@@ -16,11 +16,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://notewise-midi-trainer.taltech.chatgpt.site"),
   title: "Notewise — MIDI-тренажёр нот",
   description:
-    "Тренажёр чтения нот для занятий с MIDI-клавиатурой.",
+    "Чтение и расстановка нот, свободная игра и настраиваемый браузерный синтезатор для занятий с MIDI-клавиатурой.",
   openGraph: {
     title: "Notewise — MIDI-тренажёр нот",
     description:
-      "Чтение нот и адаптивная тренировка на скорость с MIDI-клавиатурой.",
+      "Читай ноты, играй свободно и настраивай собственный звук с MIDI-клавиатурой.",
     type: "website",
     images: [
       {
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Notewise — MIDI-тренажёр нот",
     description:
-      "Чтение нот и адаптивная тренировка на скорость с MIDI-клавиатурой.",
+      "Читай ноты, играй свободно и настраивай собственный звук с MIDI-клавиатурой.",
     images: ["/og.png"],
   },
   icons: {

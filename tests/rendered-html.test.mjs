@@ -68,6 +68,8 @@ test("keeps the training capabilities in separate modules", async () => {
   assert.match(audio, /setVolume/);
   assert.match(audio, /pendingNotes/);
   assert.match(audio, /metronomeTick/);
+  assert.match(audio, /setSound/);
+  assert.match(audio, /this\.sound\.attack/);
   assert.match(trainer, /createQuestion/);
   assert.match(trainer, /isCorrect/);
   assert.match(trainer, /KEY_SIGNATURES/);
@@ -89,6 +91,7 @@ test("keeps the training capabilities in separate modules", async () => {
   assert.doesNotMatch(flow, /const settled/);
   assert.match(freePlay, /PlayedNote/);
   assert.match(freePlay, /requestAnimationFrame/);
+  assert.match(freePlay, /startedAt - group\[0\]\.startedAt <= 110/);
   assert.match(placement, /getDiatonicIndexAtY/);
   assert.match(placement, /onPointerMove/);
   assert.match(history, /localStorage/);
@@ -103,11 +106,14 @@ test("keeps the training capabilities in separate modules", async () => {
   assert.match(settings, /<select/);
   assert.match(settings, /Альтерации вне тональности/);
   assert.match(settings, /MIDI-вход/);
+  assert.match(settings, /Настройка звука/);
+  assert.match(settings, /Шестнадцатая/);
   assert.match(notation, /KEY_SIGNATURES/);
   assert.match(notation, /displayAccidental/);
-  assert.match(launcher, /3000\.\.3010/);
+  assert.match(launcher, /8200\.\.8210/);
   assert.match(launcher, /PORT_FILE/);
   assert.match(css, /html\[data-theme="light"\]/);
+  assert.match(css, /html\[data-theme="lilac"\]/);
   assert.match(css, /scrollbar-color/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 

@@ -72,7 +72,7 @@ export function SessionHistory({
             <strong>{currentAnswered}</strong>
             нот
           </span>
-          {currentMode === "study" && (
+          {currentMode !== "flow" && (
             <span>
               <strong>{currentRecognitionMs ? `${(currentRecognitionMs / 1000).toFixed(1)} с` : "—"}</strong>
               распознавание
@@ -124,7 +124,7 @@ export function SessionHistory({
                       : "—"}
                 </p>
               )}
-              {session.mode === "study" && session.averageRecognitionMs !== undefined && (
+              {session.mode !== "flow" && session.averageRecognitionMs !== undefined && (
                 <p className="history-detail">Среднее распознавание: {(session.averageRecognitionMs / 1000).toFixed(1)} с</p>
               )}
             </article>

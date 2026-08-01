@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { drawNotation, getStaffMetrics, prepareCanvas } from "../lib/drawNotation";
-import type { NoteQuestion, ThemeMode } from "../trainers/types";
+import { drawNotation, getStaffMetrics, GRAND_STAFF_HEIGHT, prepareCanvas, SINGLE_STAFF_HEIGHT } from "../lib/drawNotation";
+import { getDiatonicIndex } from "../trainers/noteReading";
+import type { ClefMode, NoteDuration, NoteQuestion, ThemeMode } from "../trainers/types";
 
 export type PlayedNote = {
   id: string;
@@ -16,6 +17,8 @@ type FreePlayStaffProps = {
   bpm: number;
   paused: boolean;
   theme: ThemeMode;
+  clefMode: ClefMode;
+  duration: NoteDuration;
   onExpire: (ids: string[]) => void;
 };
 
@@ -25,6 +28,8 @@ export function FreePlayStaff({
   bpm,
   paused,
   theme,
+  clefMode,
+  duration,
   onExpire,
 }: FreePlayStaffProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,6 +39,7 @@ export function FreePlayStaff({
   const totalPausedRef = useRef(0);
   const virtualStartsRef = useRef(new Map<string, number>());
   const expireRef = useRef(onExpire);
+  const grandStaff = clefMode === "mixed";
 
   useEffect(() => {
     notesRef.current = notes;
@@ -53,27 +59,54 @@ export function FreePlayStaff({
         pauseStartedRef.current = null;
       }
       const visualNow = (pauseStartedRef.current ?? now) - totalPausedRef.current;
-      const prepared = prepareCanvas(canvas);
+      const prepared = prepareCanvas(canvas, grandStaff ? GRAND_STAFF_HEIGHT : SINGLE_STAFF_HEIGHT);
       if (prepared) {
-        drawNotation(prepared.context, prepared.width, referenceQuestion, "waiting", undefined, { hideNote: true });
-        const { staffLeft, staffRight } = getStaffMetrics(prepared.width);
+        drawNotation(prepared.context, prepared.width, referenceQuestion, "waiting", undefined, { hideNote: true, grandStaff, duration });
+        const { staffLeft, staffRight } = getStaffMetrics(prepared.width, referenceQuestion.clef, grandStaff);
         const beatMs = 60_000 / Math.max(1, bpm);
         const travelPerBeat = Math.max(70, (staffRight - staffLeft) / 5);
         const expired: string[] = [];
-        notesRef.current.forEach((note) => {
-          if (!virtualStartsRef.current.has(note.id)) {
-            virtualStartsRef.current.set(note.id, note.startedAt - totalPausedRef.current);
-          }
-          const virtualStart = virtualStartsRef.current.get(note.id) ?? note.startedAt;
+        const groups: PlayedNote[][] = [];
+        notesRef.current
+          .slice()
+          .sort((a, b) => a.startedAt - b.startedAt)
+          .forEach((note) => {
+            const group = groups[groups.length - 1];
+            if (group && group[0].question.clef === note.question.clef && note.startedAt - group[0].startedAt <= 110) group.push(note);
+            else groups.push([note]);
+          });
+
+        groups.forEach((group) => {
+          group.forEach((note) => {
+            if (!virtualStartsRef.current.has(note.id)) virtualStartsRef.current.set(note.id, group[0].startedAt - totalPausedRef.current);
+          });
+          const virtualStart = virtualStartsRef.current.get(group[0].id) ?? group[0].startedAt;
           const x = staffRight - 18 - ((visualNow - virtualStart) / beatMs) * travelPerBeat;
           if (x < staffLeft + 62) {
-            expired.push(note.id);
-            virtualStartsRef.current.delete(note.id);
+            group.forEach((note) => {
+              expired.push(note.id);
+              virtualStartsRef.current.delete(note.id);
+            });
             return;
           }
-          drawNotation(prepared.context, prepared.width, note.question, "waiting", undefined, {
-            notationOnly: true,
-            noteX: x,
+          const sorted = group.slice().sort((a, b) => getDiatonicIndex(a.question) - getDiatonicIndex(b.question));
+          const averageMidi = sorted.reduce((sum, note) => sum + note.question.midiNote, 0) / sorted.length;
+          const stemDirection = averageMidi >= (sorted[0].question.clef === "treble" ? 71 : 50) ? "down" : "up";
+          let previousIndex: number | null = null;
+          let offset = 0;
+          sorted.forEach((note) => {
+            const index = getDiatonicIndex(note.question);
+            if (previousIndex !== null && index - previousIndex === 1) offset = offset === 0 ? 13 : 0;
+            else offset = 0;
+            drawNotation(prepared.context, prepared.width, note.question, "waiting", undefined, {
+              notationOnly: true,
+              noteX: x,
+              grandStaff,
+              duration,
+              stemDirection,
+              headOffset: offset,
+            });
+            previousIndex = index;
           });
         });
         if (expired.length) expireRef.current(expired);
@@ -83,12 +116,12 @@ export function FreePlayStaff({
 
     frame = requestAnimationFrame(render);
     return () => cancelAnimationFrame(frame);
-  }, [bpm, referenceQuestion]);
+  }, [bpm, duration, grandStaff, referenceQuestion]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="music-staff free-play-staff"
+      className={`music-staff free-play-staff ${grandStaff ? "grand-staff" : ""}`}
       aria-label="Ноты, сыгранные в свободном режиме, движутся справа налево"
     />
   );

@@ -40,6 +40,66 @@ html[data-theme="light"] {
   --shadow: rgba(36, 45, 39, 0.13);
 }
 
+html[data-theme="lilac"] {
+  --background: #171321;
+  --surface: #211a2d;
+  --surface-elevated: #2a2139;
+  --border: rgba(235, 219, 255, 0.15);
+  --text: #f7efff;
+  --muted: #b3a5c2;
+  --accent: #c9a7ff;
+  --accent-ink: #241735;
+  --success: #8fe7c7;
+  --warning: #ffd38f;
+  --error: #ff9aa9;
+  --staff-line: rgba(247, 239, 255, 0.66);
+  --soft-fill: rgba(201, 167, 255, 0.055);
+  --hover-fill: rgba(201, 167, 255, 0.09);
+  --overlay: rgba(15, 10, 23, 0.82);
+  --piano-shell: #0f0b16;
+  --shadow: rgba(4, 2, 9, 0.42);
+}
+
+html[data-theme="sky"] {
+  --background: #e8f5fb;
+  --surface: #f7fcff;
+  --surface-elevated: #ffffff;
+  --border: rgba(24, 74, 99, 0.14);
+  --text: #143246;
+  --muted: #668393;
+  --accent: #5bbde8;
+  --accent-ink: #082c3e;
+  --success: #168d72;
+  --warning: #b06f00;
+  --error: #ca4f50;
+  --staff-line: rgba(20, 50, 70, 0.58);
+  --soft-fill: rgba(91, 189, 232, 0.055);
+  --hover-fill: rgba(91, 189, 232, 0.1);
+  --overlay: rgba(225, 243, 251, 0.84);
+  --piano-shell: #cde7f2;
+  --shadow: rgba(30, 84, 109, 0.16);
+}
+
+html[data-theme="orange"] {
+  --background: #24160d;
+  --surface: #301d11;
+  --surface-elevated: #3b2517;
+  --border: rgba(255, 224, 196, 0.15);
+  --text: #fff4e9;
+  --muted: #c3a58d;
+  --accent: #ffad55;
+  --accent-ink: #3a1b06;
+  --success: #91e1b4;
+  --warning: #ffd27a;
+  --error: #ff9483;
+  --staff-line: rgba(255, 244, 233, 0.65);
+  --soft-fill: rgba(255, 173, 85, 0.052);
+  --hover-fill: rgba(255, 173, 85, 0.09);
+  --overlay: rgba(28, 14, 6, 0.82);
+  --piano-shell: #140b06;
+  --shadow: rgba(8, 3, 1, 0.42);
+}
+
 * {
   box-sizing: border-box;
   scrollbar-color: color-mix(in srgb, var(--accent) 42%, var(--surface-elevated)) transparent;
@@ -75,7 +135,7 @@ html {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 50% -30%, rgba(185, 247, 89, 0.08), transparent 42%),
+    radial-gradient(circle at 50% -30%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 42%),
     var(--background);
   color: var(--text);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
@@ -106,7 +166,7 @@ kbd {
 
 .app-shell {
   background:
-    radial-gradient(circle at 50% -30%, rgba(185, 247, 89, 0.08), transparent 42%),
+    radial-gradient(circle at 50% -30%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 42%),
     var(--background);
   min-height: 100vh;
   overflow: hidden;
@@ -558,6 +618,18 @@ kbd {
   width: 100%;
 }
 
+.music-staff.grand-staff {
+  height: 320px;
+}
+
+.notation-card:has(.grand-staff) {
+  min-height: 390px;
+}
+
+.app-shell[data-clef="mixed"] .piano-keyboard {
+  height: clamp(120px, 17vw, 165px);
+}
+
 .flow-staff {
   cursor: crosshair;
 }
@@ -742,6 +814,7 @@ kbd {
   max-width: 860px;
   overflow-y: auto;
   padding: 28px;
+  position: relative;
   width: 100%;
 }
 
@@ -960,6 +1033,54 @@ kbd {
 
 .setting-row.is-selected .setting-arrow {
   opacity: 1;
+}
+
+.sound-designer-button {
+  border-color: var(--border);
+  cursor: pointer;
+  width: 100%;
+}
+
+.sound-designer-button:hover {
+  background: var(--hover-fill);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.sound-designer-page {
+  background: var(--surface-elevated);
+  border-radius: 18px;
+  inset: 0;
+  min-height: 100%;
+  overflow-y: auto;
+  padding: 28px;
+  position: absolute;
+  z-index: 4;
+}
+
+.sound-designer-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sound-designer-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.secondary-button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 650;
+  padding: 12px 18px;
+}
+
+.secondary-button:hover {
+  border-color: var(--accent);
 }
 
 .setting-note {
@@ -1218,6 +1339,14 @@ kbd {
 
   .music-staff {
     height: 220px;
+  }
+
+  .music-staff.grand-staff {
+    height: 300px;
+  }
+
+  .sound-designer-grid {
+    grid-template-columns: 1fr;
   }
 
   .practice-footer {

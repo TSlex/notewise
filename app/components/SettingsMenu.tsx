@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { MidiDevice } from "../hooks/useMidi";
 import { KEY_SIGNATURES } from "../trainers/noteReading";
 import type {
   ClefMode,
   KeySignature,
+  NoteDuration,
+  OscillatorWaveform,
   PracticeMode,
   RangePreset,
   SessionLength,
+  SynthPreset,
+  ThemeMode,
   ToolMode,
   TrainerSettings,
 } from "../trainers/types";
@@ -20,12 +24,20 @@ type SettingsMenuProps = {
   midiDevices: MidiDevice[];
   onChange: (settings: TrainerSettings) => void;
   onToolChange: (tool: ToolMode) => void;
+  onPreviewSound: () => void;
   onClose: () => void;
 };
 
 const KEY_OPTIONS = Object.entries(KEY_SIGNATURES) as Array<
   [KeySignature, { label: string; fifths: number }]
 >;
+
+const SYNTH_PRESETS: Record<Exclude<SynthPreset, "custom">, Pick<TrainerSettings, "waveform" | "attack" | "decay" | "sustain" | "release">> = {
+  clean: { waveform: "triangle", attack: 0.018, decay: 0.092, sustain: 0.57, release: 0.12 },
+  "soft-keys": { waveform: "sine", attack: 0.035, decay: 0.55, sustain: 0.32, release: 0.75 },
+  organ: { waveform: "square", attack: 0.008, decay: 0.08, sustain: 0.88, release: 0.18 },
+  "synth-lead": { waveform: "sawtooth", attack: 0.025, decay: 0.18, sustain: 0.64, release: 0.32 },
+};
 
 function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: () => void }) {
   return (
@@ -42,8 +54,10 @@ export function SettingsMenu({
   midiDevices,
   onChange,
   onToolChange,
+  onPreviewSound,
   onClose,
 }: SettingsMenuProps) {
+  const [soundOpen, setSoundOpen] = useState(false);
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === "Escape" && !launch) {
@@ -60,6 +74,13 @@ export function SettingsMenu({
   };
   const showTrainingSettings = tool === "training";
   const showTempo = tool === "free" || settings.practiceMode === "flow";
+  const setSoundParameter = <K extends "waveform" | "attack" | "decay" | "sustain" | "release">(key: K, value: TrainerSettings[K]) => {
+    onChange({ ...settings, [key]: value, synthPreset: "custom" });
+  };
+  const applyPreset = (preset: SynthPreset) => {
+    if (preset === "custom") return onChange({ ...settings, synthPreset: preset });
+    onChange({ ...settings, ...SYNTH_PRESETS[preset], synthPreset: preset });
+  };
 
   return (
     <div className="settings-backdrop" role="presentation">
@@ -98,7 +119,17 @@ export function SettingsMenu({
               <select value={settings.clefMode} onChange={(event) => set("clefMode", event.target.value as ClefMode)}>
                 <option value="treble">Скрипичный</option>
                 <option value="bass">Басовый</option>
-                <option value="mixed">Вперемешку</option>
+                <option value="mixed">Большой стан: оба ключа</option>
+              </select>
+            </label>
+            <label className="setting-row">
+              <span>Внешний вид ноты</span>
+              <select value={settings.noteDuration} onChange={(event) => set("noteDuration", event.target.value as NoteDuration)}>
+                <option value="whole">Целая</option>
+                <option value="half">Половинная</option>
+                <option value="quarter">Четвертная</option>
+                <option value="eighth">Восьмая</option>
+                <option value="sixteenth">Шестнадцатая</option>
               </select>
             </label>
             {showTrainingSettings && (
@@ -167,16 +198,25 @@ export function SettingsMenu({
               <span>Громкость <strong>{Math.round(settings.volume * 100)}%</strong></span>
               <input aria-label="Громкость" type="range" min="0" max="100" step="5" value={Math.round(settings.volume * 100)} onChange={(event) => set("volume", Number(event.target.value) / 100)} />
             </label>
+            <button type="button" className="setting-row sound-designer-button" onClick={() => setSoundOpen(true)}>
+              <span>Тембр и огибающая</span><strong>Настроить →</strong>
+            </button>
             {showTrainingSettings && settings.practiceMode === "flow" && (
               <div className="setting-row">
                 <span>Метроном</span>
                 <Toggle checked={settings.metronomeEnabled} label={settings.metronomeEnabled ? "Слышен" : "Без звука"} onChange={() => set("metronomeEnabled", !settings.metronomeEnabled)} />
               </div>
             )}
-            <div className="setting-row">
-              <span>Светлая тема</span>
-              <Toggle checked={settings.theme === "light"} label={settings.theme === "light" ? "Включена" : "Выключена"} onChange={() => set("theme", settings.theme === "light" ? "dark" : "light")} />
-            </div>
+            <label className="setting-row">
+              <span>Цветовая тема</span>
+              <select value={settings.theme} onChange={(event) => set("theme", event.target.value as ThemeMode)}>
+                <option value="dark">Тёмная</option>
+                <option value="light">Светлая</option>
+                <option value="lilac">Сиреневая</option>
+                <option value="sky">Голубая</option>
+                <option value="orange">Оранжевая</option>
+              </select>
+            </label>
             <p className="setting-note">Старые настройки сохраняются. Параметры упражнения начинают новую сессию, если в текущей уже были ответы.</p>
           </div>
 
@@ -194,6 +234,47 @@ export function SettingsMenu({
             <p className="shortcut-note">Буквенные команды работают по физическому расположению клавиш при любой раскладке.</p>
           </div>
         </div>
+        {soundOpen && (
+          <div className="sound-designer-page">
+            <div className="settings-heading">
+              <div><p className="eyebrow">Web Audio синтезатор</p><h2>Настройка звука</h2></div>
+              <button type="button" className="key-button" onClick={() => setSoundOpen(false)} aria-label="Вернуться к настройкам">← Назад</button>
+            </div>
+            <div className="sound-designer-grid">
+              <label className="setting-row">
+                <span>Пресет</span>
+                <select value={settings.synthPreset} onChange={(event) => applyPreset(event.target.value as SynthPreset)}>
+                  <option value="clean">Чистый · по умолчанию</option>
+                  <option value="soft-keys">Мягкие клавиши</option>
+                  <option value="organ">Орган</option>
+                  <option value="synth-lead">Синт-лид</option>
+                  <option value="custom">Пользовательский</option>
+                </select>
+              </label>
+              <label className="setting-row">
+                <span>Форма волны</span>
+                <select value={settings.waveform} onChange={(event) => setSoundParameter("waveform", event.target.value as OscillatorWaveform)}>
+                  <option value="sine">Sine</option><option value="triangle">Triangle</option><option value="square">Square</option><option value="sawtooth">Sawtooth</option>
+                </select>
+              </label>
+              {([
+                ["attack", "Attack", 0.005, 2, 0.005],
+                ["decay", "Decay", 0.01, 2, 0.01],
+                ["sustain", "Sustain", 0, 1, 0.01],
+                ["release", "Release", 0.02, 3, 0.01],
+              ] as const).map(([key, label, min, max, step]) => (
+                <label className="setting-row setting-slider" key={key}>
+                  <span>{label} <strong>{settings[key].toFixed(key === "sustain" ? 2 : 3)}{key === "sustain" ? "" : " с"}</strong></span>
+                  <input aria-label={label} type="range" min={min} max={max} step={step} value={settings[key]} onChange={(event) => setSoundParameter(key, Number(event.target.value))} />
+                </label>
+              ))}
+            </div>
+            <div className="sound-designer-actions">
+              <button type="button" className="secondary-button" onClick={onPreviewSound}>Прослушать до первой</button>
+              <button type="button" className="primary-button" onClick={() => setSoundOpen(false)}>Готово</button>
+            </div>
+          </div>
+        )}
         {launch && <button className="primary-button launch-button" onClick={onClose}>Начать</button>}
       </section>
     </div>

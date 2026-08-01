@@ -5,8 +5,8 @@ import { useMidi } from "../hooks/useMidi";
 import { useSessionTimer } from "../hooks/useSessionTimer";
 import { AudioEngine } from "../lib/audioEngine";
 import { loadSessionCount, loadSessionHistory, saveSessionRecord, type SessionRecord } from "../lib/sessionHistory";
-import { createQuestionForMidi, formatNoteName, getDiatonicIndex, KEY_SIGNATURES, noteReadingTrainer } from "../trainers/noteReading";
-import type { NoteQuestion, PracticeMode, ToolMode, TrainerSettings } from "../trainers/types";
+import { createQuestionForMidi, formatNoteName, getDiatonicIndex, KEY_SIGNATURES, NATURAL_PITCH_CLASSES, noteReadingTrainer } from "../trainers/noteReading";
+import type { NoteQuestion, PracticeMode, ThemeMode, ToolMode, TrainerSettings } from "../trainers/types";
 import { FlowStaff } from "./FlowStaff";
 import { FreePlayStaff, type PlayedNote } from "./FreePlayStaff";
 import { MusicStaff } from "./MusicStaff";
@@ -20,6 +20,7 @@ const MIN_FLOW_BPM = 1;
 const MAX_FLOW_BPM = 200;
 const FLOW_STEP_BPM = 4;
 const FLOW_QUEUE_SIZE = 6;
+const THEMES: ThemeMode[] = ["dark", "light", "lilac", "sky", "orange"];
 
 const DEFAULT_SETTINGS: TrainerSettings = {
   practiceMode: "study",
@@ -35,6 +36,13 @@ const DEFAULT_SETTINGS: TrainerSettings = {
   accidentalsEnabled: false,
   midiInputId: "",
   theme: "dark",
+  noteDuration: "quarter",
+  synthPreset: "clean",
+  waveform: "triangle",
+  attack: 0.018,
+  decay: 0.092,
+  sustain: 0.57,
+  release: 0.12,
 };
 
 type FeedbackState = "waiting" | "correct" | "wrong" | "revealed";
@@ -65,8 +73,16 @@ function loadSettings(): TrainerSettings {
     const merged = { ...DEFAULT_SETTINGS, ...saved } as TrainerSettings;
     if (!(merged.keySignature in KEY_SIGNATURES)) merged.keySignature = "C";
     if (!["study", "flow", "placement"].includes(merged.practiceMode)) merged.practiceMode = "study";
+    if (!THEMES.includes(merged.theme)) merged.theme = "dark";
+    if (!["whole", "half", "quarter", "eighth", "sixteenth"].includes(merged.noteDuration)) merged.noteDuration = "quarter";
+    if (!["sine", "triangle", "square", "sawtooth"].includes(merged.waveform)) merged.waveform = "triangle";
+    if (!["clean", "soft-keys", "organ", "synth-lead", "custom"].includes(merged.synthPreset)) merged.synthPreset = "clean";
     merged.flowBpm = Math.max(MIN_FLOW_BPM, Math.min(MAX_FLOW_BPM, Number(merged.flowBpm) || 72));
     merged.adaptiveFlowBpm = merged.adaptiveFlowBpm !== false;
+    merged.attack = Math.max(0.005, Math.min(2, Number(merged.attack) || DEFAULT_SETTINGS.attack));
+    merged.decay = Math.max(0.01, Math.min(2, Number(merged.decay) || DEFAULT_SETTINGS.decay));
+    merged.sustain = Math.max(0, Math.min(1, Number(merged.sustain)));
+    merged.release = Math.max(0.02, Math.min(3, Number(merged.release) || DEFAULT_SETTINGS.release));
     return merged;
   } catch {
     return DEFAULT_SETTINGS;
@@ -81,9 +97,8 @@ function calculateAccuracy(stats: SessionStats, mode: PracticeMode) {
 
 function createFlowQueue(settings: TrainerSettings, count = FLOW_QUEUE_SIZE) {
   const first = noteReadingTrainer.createQuestion(settings);
-  const fixedSettings = { ...settings, clefMode: first.clef };
   const result = [first];
-  while (result.length < count) result.push(noteReadingTrainer.createQuestion(fixedSettings, result[result.length - 1]));
+  while (result.length < count) result.push(noteReadingTrainer.createQuestion(settings, result[result.length - 1]));
   return result;
 }
 
@@ -160,7 +175,7 @@ export function PracticeApp() {
       range: activeSettings.range,
       keySignature: activeSettings.keySignature,
       finalBpm: activeSettings.practiceMode === "flow" ? flowBpmRef.current : undefined,
-      averageRecognitionMs: activeSettings.practiceMode === "study"
+      averageRecognitionMs: activeSettings.practiceMode === "study" || activeSettings.practiceMode === "placement"
         ? Math.round(finalStats.recognitionTotalMs / finalStats.answered)
         : undefined,
     };
@@ -185,6 +200,7 @@ export function PracticeApp() {
       setTotalSessions(loadSessionCount());
       audioRef.current = new AudioEngine();
       audioRef.current.setVolume(loaded.volume);
+      audioRef.current.setSound(loaded);
       document.documentElement.dataset.theme = loaded.theme;
       hydratedRef.current = true;
       resetTimer();
@@ -198,6 +214,7 @@ export function PracticeApp() {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
     document.documentElement.dataset.theme = settings.theme;
     audioRef.current?.setVolume(settings.volume);
+    audioRef.current?.setSound(settings);
     if (!settings.soundEnabled) audioRef.current?.stopAll();
   }, [settings]);
 
@@ -288,7 +305,6 @@ export function PracticeApp() {
     else { setFeedback("waiting"); setFeedbackText("Следующая нота — держи пульс"); }
 
     flowWindowRef.current.push(correct);
-    let rebuildQueue = false;
     if (flowWindowRef.current.length === 5) {
       if (settingsRef.current.adaptiveFlowBpm) {
         const correctCount = flowWindowRef.current.filter(Boolean).length;
@@ -299,7 +315,6 @@ export function PracticeApp() {
         setFlowBpm(nextBpm);
       }
       flowWindowRef.current = [];
-      rebuildQueue = settingsRef.current.clefMode === "mixed";
     }
 
     flowAnsweredRef.current = false;
@@ -308,10 +323,13 @@ export function PracticeApp() {
     if (length !== "endless" && nextStats.answered >= length) {
       setCompleted(true); setPaused(true); archiveSession(nextStats); return;
     }
-    const nextQueue = rebuildQueue ? createFlowQueue(settingsRef.current) : (() => {
+    const nextQueue = (() => {
       const remaining = flowQueueRef.current.slice(1);
       const clefMode = remaining[0]?.clef ?? currentQuestion?.clef ?? "treble";
-      const tail = noteReadingTrainer.createQuestion({ ...settingsRef.current, clefMode }, remaining[remaining.length - 1]);
+      const tailSettings = settingsRef.current.clefMode === "mixed"
+        ? settingsRef.current
+        : { ...settingsRef.current, clefMode };
+      const tail = noteReadingTrainer.createQuestion(tailSettings, remaining[remaining.length - 1]);
       return [...remaining, tail];
     })();
     flowQueueRef.current = nextQueue;
@@ -356,11 +374,16 @@ export function PracticeApp() {
     if (blockedRef.current || paused || settingsOpen || launchOpen || completed || settingsRef.current.practiceMode !== "placement") return;
     const target = questionRef.current;
     const correct = diatonicIndex === getDiatonicIndex(target);
+    const letterIndex = ((diatonicIndex % 7) + 7) % 7;
+    const octave = Math.floor(diatonicIndex / 7);
+    const placedMidi = Math.max(0, Math.min(127, (octave + 1) * 12 + NATURAL_PITCH_CLASSES[letterIndex] + target.accidental));
+    if (settingsRef.current.soundEnabled) void audioRef.current?.preview(placedMidi);
+    const recognitionMs = Math.max(0, readElapsed() - questionStartedElapsedRef.current);
     setPlacedIndex(diatonicIndex);
     if (correct) {
       const firstTry = attemptRef.current === 0;
       setFeedback("correct"); setFeedbackText(firstTry ? "Верно" : "Получилось");
-      settleQuestion({ delay: 650, correct: true, firstTry });
+      settleQuestion({ delay: 650, correct: true, firstTry, recognitionMs });
       return;
     }
     const nextAttempt = attemptRef.current + 1;
@@ -369,20 +392,19 @@ export function PracticeApp() {
     setFeedback("wrong");
     if (nextAttempt >= 3) {
       setFeedback("revealed"); setFeedbackText(`Правильное положение: ${formatNoteName(target)}`);
-      settleQuestion({ delay: 1900, correct: false, firstTry: false });
+      settleQuestion({ delay: 1900, correct: false, firstTry: false, recognitionMs });
     } else {
       setFeedbackText(nextAttempt === 1 ? "Не здесь. Попробуй ещё" : "Ещё одна попытка");
       feedbackTimerRef.current = setTimeout(() => { setPlacedIndex(null); setFeedback("waiting"); setFeedbackText(`Поставь на стан: ${formatNoteName(target)}`); }, 520);
     }
-  }, [completed, launchOpen, paused, settingsOpen, settleQuestion, updateStats]);
+  }, [completed, launchOpen, paused, readElapsed, settingsOpen, settleQuestion, updateStats]);
 
   const noteOn = useCallback((midiNote: number) => {
     setActiveNotes((current) => new Set(current).add(midiNote));
     if (settingsRef.current.soundEnabled) void audioRef.current?.noteOn(midiNote);
     if (toolRef.current === "free" && !paused && !settingsOpen && !launchOpen) {
-      const freeSettings = { ...settingsRef.current, clefMode: settingsRef.current.clefMode === "mixed" ? "treble" as const : settingsRef.current.clefMode };
-      const played: PlayedNote = { id: `free-${midiNote}-${Date.now()}-${Math.random()}`, question: createQuestionForMidi(midiNote, freeSettings), startedAt: performance.now() };
-      setFreeNotes((current) => [...current.slice(-39), played]);
+      const played: PlayedNote = { id: `free-${midiNote}-${Date.now()}-${Math.random()}`, question: createQuestionForMidi(midiNote, settingsRef.current), startedAt: performance.now() };
+      setFreeNotes((current) => [...current.slice(-79), played]);
     } else submitNote(midiNote);
   }, [launchOpen, paused, settingsOpen, submitNote]);
 
@@ -446,7 +468,7 @@ export function PracticeApp() {
         const modes: PracticeMode[] = ["study", "flow", "placement"];
         updateSettings({ ...settingsRef.current, practiceMode: modes[(modes.indexOf(settingsRef.current.practiceMode) + 1) % modes.length] });
       }
-      if (event.code === "KeyT") { event.preventDefault(); updateSettings({ ...settingsRef.current, theme: settingsRef.current.theme === "dark" ? "light" : "dark" }); }
+      if (event.code === "KeyT") { event.preventDefault(); const index = THEMES.indexOf(settingsRef.current.theme); updateSettings({ ...settingsRef.current, theme: THEMES[(index + 1) % THEMES.length] }); }
       if (event.code === "Equal" || event.code === "NumpadAdd") { event.preventDefault(); updateSettings({ ...settingsRef.current, volume: Math.min(1, settingsRef.current.volume + 0.1) }); }
       if (event.code === "Minus" || event.code === "NumpadSubtract") { event.preventDefault(); updateSettings({ ...settingsRef.current, volume: Math.max(0, settingsRef.current.volume - 0.1) }); }
     };
@@ -455,11 +477,11 @@ export function PracticeApp() {
   }, [completed, launchOpen, restartSession, settingsOpen, updateSettings]);
 
   const accuracy = calculateAccuracy(stats, settings.practiceMode);
-  const averageRecognitionMs = stats.answered && settings.practiceMode === "study" ? stats.recognitionTotalMs / stats.answered : 0;
+  const averageRecognitionMs = stats.answered && (settings.practiceMode === "study" || settings.practiceMode === "placement") ? stats.recognitionTotalMs / stats.answered : 0;
   const currentPosition = settings.sessionLength === "endless" ? `${stats.answered + 1} · ∞` : `${Math.min(stats.answered + 1, settings.sessionLength)} / ${settings.sessionLength}`;
   const elapsedSeconds = Math.floor(elapsedMs / 1000);
   const activeQuestion = settings.practiceMode === "flow" ? flowQueue[0] : question;
-  const freeReferenceQuestion = useMemo(() => createQuestionForMidi(settings.clefMode === "bass" ? 48 : 60, { ...settings, clefMode: settings.clefMode === "mixed" ? "treble" : settings.clefMode }), [settings]);
+  const freeReferenceQuestion = useMemo(() => createQuestionForMidi(settings.clefMode === "bass" ? 48 : 60, settings), [settings]);
 
   const midiCopy = useMemo(() => {
     if (midiStatus === "connected") return deviceName;
@@ -469,13 +491,14 @@ export function PracticeApp() {
     return "Подключить MIDI";
   }, [deviceName, midiStatus]);
 
-  const clefLabel = settings.clefMode === "treble" ? "Скрипичный" : settings.clefMode === "bass" ? "Басовый" : "Ключи вперемешку";
+  const clefLabel = settings.clefMode === "treble" ? "Скрипичный" : settings.clefMode === "bass" ? "Басовый" : "Большой стан";
   const rangeLabel = settings.range === "octave" ? "1 октава" : settings.range === "octave-half" ? "1½ октавы" : "2 октавы";
   const practiceTitle = settings.practiceMode === "flow" ? "Чтение на скорость" : settings.practiceMode === "placement" ? "Расстановка нот" : "Чтение нот";
   const adjustFlowBpm = (delta: number) => { const next = Math.max(MIN_FLOW_BPM, Math.min(MAX_FLOW_BPM, flowBpmRef.current + delta)); flowBpmRef.current = next; setFlowBpm(next); };
+  const cycleTheme = () => { const index = THEMES.indexOf(settings.theme); updateSettings({ ...settings, theme: THEMES[(index + 1) % THEMES.length] }); };
 
   return (
-    <main className="app-shell" data-theme={settings.theme}>
+    <main className="app-shell" data-theme={settings.theme} data-clef={settings.clefMode}>
       <header className="topbar">
         <div className="brand" aria-label="Notewise"><span className="brand-mark">N</span><span>notewise</span></div>
         <nav className="tool-nav" aria-label="Инструменты">
@@ -484,7 +507,7 @@ export function PracticeApp() {
         </nav>
         <div className="top-actions">
           <button className={`status-pill ${midiStatus === "connected" ? "is-connected" : ""}`} onClick={() => { void audioRef.current?.activate(); void connect(); }}><span className="status-dot" />{midiCopy}</button>
-          <button className="theme-toggle" onClick={() => updateSettings({ ...settings, theme: settings.theme === "dark" ? "light" : "dark" })} aria-label="Сменить тему">{settings.theme === "dark" ? "☼" : "☾"}</button>
+          <button className="theme-toggle" onClick={cycleTheme} aria-label="Сменить тему">◐</button>
           <button className={`sound-toggle ${settings.soundEnabled ? "is-on" : ""}`} onClick={() => { void audioRef.current?.activate(); updateSettings({ ...settings, soundEnabled: !settings.soundEnabled }); }} aria-label={settings.soundEnabled ? "Выключить звук приложения" : "Включить звук приложения"}>{settings.soundEnabled ? `Звук ${Math.round(settings.volume * 100)}%` : "Звук выкл."}</button>
           <button className="menu-trigger" onClick={() => setSettingsOpen(true)}><span>Настройки</span><kbd>Esc</kbd></button>
         </div>
@@ -502,19 +525,19 @@ export function PracticeApp() {
               </div>
             </div>
             <div className={`notation-card feedback-${feedback}`}>
-              {settings.practiceMode === "flow" ? <FlowStaff questions={flowQueue} state={feedback} theme={settings.theme} bpm={flowBpm} paused={paused || settingsOpen || launchOpen || completed} onTimeout={handleFlowTick} />
-                : settings.practiceMode === "placement" ? <PlacementStaff question={question} state={feedback} theme={settings.theme} placedIndex={placedIndex} disabled={paused || settingsOpen || launchOpen || completed} onPlace={submitPlacement} />
-                  : <MusicStaff question={question} state={feedback} theme={settings.theme} />}
+              {settings.practiceMode === "flow" ? <FlowStaff questions={flowQueue} state={feedback} theme={settings.theme} clefMode={settings.clefMode} duration={settings.noteDuration} bpm={flowBpm} paused={paused || settingsOpen || launchOpen || completed} onTimeout={handleFlowTick} />
+                : settings.practiceMode === "placement" ? <PlacementStaff question={question} state={feedback} theme={settings.theme} clefMode={settings.clefMode} duration={settings.noteDuration} placedIndex={placedIndex} disabled={paused || settingsOpen || launchOpen || completed} onPlace={submitPlacement} />
+                  : <MusicStaff question={question} state={feedback} theme={settings.theme} clefMode={settings.clefMode} duration={settings.noteDuration} />}
               <div className="feedback-line" aria-live="polite"><span className={`feedback-icon feedback-${feedback}`}>{feedback === "correct" ? "✓" : feedback === "wrong" ? "↺" : feedback === "revealed" ? "→" : "·"}</span><span>{feedbackText}</span></div>
             </div>
             {settings.practiceMode !== "placement" && <PianoKeyboard activeNotes={activeNotes} revealedNote={feedback === "revealed" && settings.practiceMode === "study" ? activeQuestion?.midiNote : undefined} disabled={paused || settingsOpen || launchOpen || completed} onNoteOn={noteOn} onNoteOff={noteOff} />}
-            <div className="practice-footer"><div className="stats-row"><span>Точность <strong>{accuracy}%</strong></span><span>Ошибки <strong>{stats.totalMistakes}</strong></span>{settings.practiceMode === "study" && <span>Распознавание <strong>{averageRecognitionMs ? `${(averageRecognitionMs / 1000).toFixed(1)} с` : "—"}</strong></span>}{settings.practiceMode === "flow" && <span>Пропущено <strong>{stats.missed}</strong></span>}<span>Серия <strong>{stats.streak}</strong></span></div><p className="footer-hint"><kbd>Esc</kbd> настройки и управление</p></div>
+            <div className="practice-footer"><div className="stats-row"><span>Точность <strong>{accuracy}%</strong></span><span>Ошибки <strong>{stats.totalMistakes}</strong></span>{settings.practiceMode !== "flow" && <span>Распознавание <strong>{averageRecognitionMs ? `${(averageRecognitionMs / 1000).toFixed(1)} с` : "—"}</strong></span>}{settings.practiceMode === "flow" && <span>Пропущено <strong>{stats.missed}</strong></span>}<span>Серия <strong>{stats.streak}</strong></span></div><p className="footer-hint"><kbd>Esc</kbd> настройки и управление</p></div>
           </section>
         </div>
       ) : (
         <section className="practice-stage free-stage">
           <div className="practice-meta"><div><p className="eyebrow">Свободный режим</p><h1>{clefLabel}<span> · без статистики</span></h1></div><div className="session-summary"><span className="tempo-control"><button aria-label="Замедлить" onClick={() => adjustFlowBpm(-1)}>−</button><span className="tempo-badge">{flowBpm} BPM</span><button aria-label="Ускорить" onClick={() => adjustFlowBpm(1)}>+</button></span></div></div>
-          <div className="notation-card free-card"><FreePlayStaff notes={freeNotes} referenceQuestion={freeReferenceQuestion} bpm={flowBpm} paused={paused || settingsOpen || launchOpen} theme={settings.theme} onExpire={(ids) => setFreeNotes((current) => current.filter((note) => !ids.includes(note.id)))} /><div className="feedback-line"><span className="feedback-icon">♪</span><span>Играй — нажатые ноты появятся на стане</span></div></div>
+          <div className="notation-card free-card"><FreePlayStaff notes={freeNotes} referenceQuestion={freeReferenceQuestion} clefMode={settings.clefMode} duration={settings.noteDuration} bpm={flowBpm} paused={paused || settingsOpen || launchOpen} theme={settings.theme} onExpire={(ids) => setFreeNotes((current) => current.filter((note) => !ids.includes(note.id)))} /><div className="feedback-line"><span className="feedback-icon">♪</span><span>Играй — нажатые ноты появятся на стане</span></div></div>
           <PianoKeyboard activeNotes={activeNotes} disabled={paused || settingsOpen || launchOpen} onNoteOn={noteOn} onNoteOff={noteOff} />
           <div className="practice-footer"><div className="stats-row"><span>Сыграно на экране <strong>{freeNotes.length}</strong></span></div><p className="footer-hint"><kbd>R</kbd> очистить поток</p></div>
         </section>
@@ -522,7 +545,7 @@ export function PracticeApp() {
 
       {paused && !settingsOpen && !launchOpen && !completed && <div className="pause-overlay"><button className="pause-card" onClick={() => setPaused(false)}><span className="pause-symbol">Ⅱ</span><strong>Пауза</strong><small>Space или нажми здесь, чтобы продолжить</small></button></div>}
       {completed && <div className="settings-backdrop"><section className="completion-card" role="dialog" aria-modal="true"><p className="eyebrow">Сессия завершена</p><h2>{accuracy}% точности</h2><p>{stats.answered} нот · {formatDuration(elapsedSeconds)} · лучшая серия {stats.bestStreak}</p><button className="primary-button" onClick={() => restartSession()}>Новая сессия <kbd>R</kbd></button></section></div>}
-      {(launchOpen || settingsOpen) && <SettingsMenu settings={settings} tool={tool} launch={launchOpen} midiDevices={midiDevices} onChange={updateSettings} onToolChange={changeTool} onClose={closeMenu} />}
+      {(launchOpen || settingsOpen) && <SettingsMenu settings={settings} tool={tool} launch={launchOpen} midiDevices={midiDevices} onChange={updateSettings} onToolChange={changeTool} onPreviewSound={() => { if (settings.soundEnabled) void audioRef.current?.preview(60, 0.65); }} onClose={closeMenu} />}
     </main>
   );
 }

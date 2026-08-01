@@ -87,11 +87,11 @@ if not exist "%SERVER_SCRIPT%" (
 
 call :find_port
 if not defined APP_PORT (
-  echo Could not find a free local port between 3000 and 3010.
+  echo Could not find a free local port between 8200 and 8210.
   exit /b 1
 )
 >"%PORT_FILE%" echo !APP_PORT!
-if not "!APP_PORT!"=="3000" echo Port 3000 is busy. Notewise will use port !APP_PORT!.
+if not "!APP_PORT!"=="8200" echo Port 8200 is busy. Notewise will use port !APP_PORT!.
 
 del "%PID_FILE%" >nul 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$server = '%SERVER_SCRIPT%'; $log = '%LOG_FILE%'; $quote = [char]34; $command = 'call ' + $quote + $server + $quote + ' !APP_PORT! ^> ' + $quote + $log + $quote + ' 2^>^&1'; $process = Start-Process -FilePath $env:ComSpec -ArgumentList '/d','/c',$command -WorkingDirectory '%APP_DIR%' -WindowStyle Hidden -PassThru; Set-Content -LiteralPath '%PID_FILE%' -Value $process.Id -NoNewline"
@@ -157,11 +157,11 @@ set "RUNNING_PID=%CANDIDATE_PID%"
 exit /b 0
 
 :load_port
-set "APP_PORT=3000"
+set "APP_PORT=8200"
 if exist "%PORT_FILE%" set /p "APP_PORT="<"%PORT_FILE%"
 exit /b 0
 
 :find_port
 set "APP_PORT="
-for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$used = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners().Port; 3000..3010 | Where-Object { $_ -notin $used } | Select-Object -First 1"`) do set "APP_PORT=%%P"
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$used = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners().Port; 8200..8210 | Where-Object { $_ -notin $used } | Select-Object -First 1"`) do set "APP_PORT=%%P"
 exit /b 0
