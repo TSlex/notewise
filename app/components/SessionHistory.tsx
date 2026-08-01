@@ -8,7 +8,8 @@ type SessionHistoryProps = {
   elapsedSeconds: number;
   currentAccuracy: number;
   currentAnswered: number;
-  currentMode: "study" | "flow";
+  currentMode: "study" | "flow" | "placement";
+  currentRecognitionMs: number;
 };
 
 export function formatDuration(totalSeconds: number) {
@@ -42,7 +43,11 @@ export function SessionHistory({
   currentAccuracy,
   currentAnswered,
   currentMode,
+  currentRecognitionMs,
 }: SessionHistoryProps) {
+  const modeLabel = currentMode === "flow"
+    ? "Чтение на скорость"
+    : currentMode === "placement" ? "Расстановка нот" : "Чтение нот";
   return (
     <aside className="history-sidebar">
       <div className="history-heading">
@@ -56,7 +61,7 @@ export function SessionHistory({
           <strong>{formatDuration(elapsedSeconds)}</strong>
         </div>
         <p>
-          {currentMode === "flow" ? "Чтение на скорость" : "Чтение нот"}
+          {modeLabel}
         </p>
         <div className="current-session-metrics">
           <span>
@@ -67,6 +72,12 @@ export function SessionHistory({
             <strong>{currentAnswered}</strong>
             нот
           </span>
+          {currentMode === "study" && (
+            <span>
+              <strong>{currentRecognitionMs ? `${(currentRecognitionMs / 1000).toFixed(1)} с` : "—"}</strong>
+              распознавание
+            </span>
+          )}
         </div>
       </section>
 
@@ -87,9 +98,7 @@ export function SessionHistory({
             <article className="history-item" key={session.id}>
               <div className="history-item-top">
                 <strong>
-                  {session.mode === "flow"
-                    ? "Чтение на скорость"
-                    : "Чтение нот"}
+                  {session.mode === "flow" ? "Чтение на скорость" : session.mode === "placement" ? "Расстановка нот" : "Чтение нот"}
                 </strong>
                 <span>{formatSessionDate(session.finishedAt)}</span>
               </div>
@@ -114,6 +123,9 @@ export function SessionHistory({
                       ? `${(session.finalFlowDurationMs / 1000).toFixed(1)} с`
                       : "—"}
                 </p>
+              )}
+              {session.mode === "study" && session.averageRecognitionMs !== undefined && (
+                <p className="history-detail">Среднее распознавание: {(session.averageRecognitionMs / 1000).toFixed(1)} с</p>
               )}
             </article>
           ))

@@ -11,6 +11,26 @@ const CLEF_BOTTOM_LINE = {
 const SHARP_STEPS = { treble: [8, 5, 9, 6, 3, 7, 4], bass: [6, 3, 7, 4, 1, 5, 2] };
 const FLAT_STEPS = { treble: [4, 7, 3, 6, 2, 5, 1], bass: [2, 5, 1, 4, 0, 3, -1] };
 
+export function getStaffMetrics(width: number) {
+  const spacing = 18;
+  const topLine = 76;
+  const bottomLine = topLine + spacing * 4;
+  const staffMargin = Math.max(48, width * 0.055);
+  return {
+    spacing,
+    topLine,
+    bottomLine,
+    staffLeft: staffMargin,
+    staffRight: width - staffMargin,
+  };
+}
+
+export function getDiatonicIndexAtY(clef: NoteQuestion["clef"], y: number, width: number) {
+  const { spacing, bottomLine } = getStaffMetrics(width);
+  const baseIndex = getDiatonicIndex(CLEF_BOTTOM_LINE[clef]);
+  return baseIndex + Math.round((bottomLine - y) / (spacing / 2));
+}
+
 function cssColor(name: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
   return (
@@ -47,7 +67,13 @@ export function drawNotation(
   question: NoteQuestion,
   state: NotationState,
   progress?: number,
-  options: { flowIndex?: number; notationOnly?: boolean } = {},
+  options: {
+    flowIndex?: number;
+    notationOnly?: boolean;
+    hideNote?: boolean;
+    noteX?: number;
+    noteOpacity?: number;
+  } = {},
 ) {
   const text = cssColor("--text", "#f5f4ef");
   const lineColor = cssColor("--staff-line", "rgba(245, 244, 239, 0.64)");
@@ -58,20 +84,16 @@ export function drawNotation(
     revealed: cssColor("--warning", "#ffd786"),
   };
   const ink = colors[state];
-  const spacing = 18;
-  const topLine = 76;
-  const bottomLine = topLine + spacing * 4;
-  const staffMargin = Math.max(48, width * 0.055);
-  const staffLeft = staffMargin;
-  const staffRight = width - staffMargin;
+  const { spacing, topLine, bottomLine, staffLeft, staffRight } = getStaffMetrics(width);
   const fixedNoteX = width / 2;
   const finishLineX = staffLeft + Math.max(122, width * 0.16);
   const flowIndex = options.flowIndex ?? 0;
   const flowSpacing = Math.min(135, (staffRight - finishLineX) / 4.2);
-  const noteX =
+  const noteX = options.noteX ?? (
     progress === undefined
       ? fixedNoteX
-      : finishLineX + (1 - Math.min(progress, 1) + flowIndex) * flowSpacing;
+      : finishLineX + (1 - Math.min(progress, 1) + flowIndex) * flowSpacing
+  );
 
   if (!options.notationOnly) {
     context.strokeStyle = lineColor;
@@ -124,10 +146,14 @@ export function drawNotation(
   }
   }
 
+  if (options.hideNote) return;
+
   const baseIndex = getDiatonicIndex(CLEF_BOTTOM_LINE[question.clef]);
   const noteIndex = getDiatonicIndex(question);
   const noteY = bottomLine - (noteIndex - baseIndex) * (spacing / 2);
 
+  context.save();
+  context.globalAlpha = options.noteOpacity ?? 1;
   context.strokeStyle = lineColor;
   context.lineWidth = 1.4;
   if (noteY <= topLine - spacing) {
@@ -175,4 +201,5 @@ export function drawNotation(
     context.textBaseline = "middle";
     context.fillText(question.displayAccidental, noteX - 29, noteY + 1);
   }
+  context.restore();
 }

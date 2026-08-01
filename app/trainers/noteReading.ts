@@ -7,8 +7,8 @@ import type {
   TrainerSettings,
 } from "./types";
 
-const NATURAL_PITCH_CLASSES = [0, 2, 4, 5, 7, 9, 11];
-const NOTE_NAMES = ["до", "ре", "ми", "фа", "соль", "ля", "си"];
+export const NATURAL_PITCH_CLASSES = [0, 2, 4, 5, 7, 9, 11];
+export const NOTE_NAMES = ["до", "ре", "ми", "фа", "соль", "ля", "си"];
 
 export const KEY_SIGNATURES: Record<KeySignature, { label: string; fifths: number }> = {
   C: { label: "До мажор", fifths: 0 }, G: { label: "Соль мажор", fifths: 1 },
@@ -110,6 +110,44 @@ function notesForRange(clef: Clef, range: RangePreset, settings: TrainerSettings
 function chooseClef(settings: TrainerSettings): Clef {
   if (settings.clefMode !== "mixed") return settings.clefMode;
   return Math.random() > 0.5 ? "treble" : "bass";
+}
+
+export function createQuestionForMidi(midiNote: number, settings: TrainerSettings): NoteQuestion {
+  const clef = settings.clefMode === "mixed"
+    ? (midiNote >= 60 ? "treble" : "bass")
+    : settings.clefMode;
+  const signature = keyAccidentals(settings.keySignature);
+  const candidates: Array<{ letterIndex: number; octave: number; accidental: -1 | 0 | 1 }> = [];
+
+  for (let octave = Math.floor(midiNote / 12) - 2; octave <= Math.floor(midiNote / 12); octave += 1) {
+    NATURAL_PITCH_CLASSES.forEach((pitchClass, letterIndex) => {
+      const naturalMidi = (octave + 1) * 12 + pitchClass;
+      const accidental = midiNote - naturalMidi;
+      if (accidental >= -1 && accidental <= 1) {
+        candidates.push({ letterIndex, octave, accidental: accidental as -1 | 0 | 1 });
+      }
+    });
+  }
+
+  const selected = candidates.find((candidate) => signature[candidate.letterIndex] === candidate.accidental)
+    ?? candidates.find((candidate) => candidate.accidental === 0)
+    ?? candidates[0];
+  const baseAccidental = signature[selected.letterIndex];
+
+  return {
+    id: `played-${midiNote}-${Date.now()}-${Math.random()}`,
+    kind: "single-note",
+    clef,
+    midiNote,
+    noteName: NOTE_NAMES[selected.letterIndex],
+    octave: selected.octave,
+    letterIndex: selected.letterIndex,
+    accidental: selected.accidental,
+    displayAccidental: selected.accidental === baseAccidental
+      ? undefined
+      : selected.accidental === 0 ? "♮" : selected.accidental === 1 ? "♯" : "♭",
+    keySignature: settings.keySignature,
+  };
 }
 
 export const noteReadingTrainer: TrainerModule<NoteQuestion> = {

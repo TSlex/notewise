@@ -2,7 +2,8 @@ export type Clef = "treble" | "bass";
 export type ClefMode = Clef | "mixed";
 export type RangePreset = "octave" | "octave-half" | "two-octaves";
 export type SessionLength = 10 | 20 | "endless";
-export type PracticeMode = "study" | "flow";
+export type PracticeMode = "study" | "flow" | "placement";
+export type ToolMode = "training" | "free";
 export type ThemeMode = "dark" | "light";
 export type KeySignature =
   | "C" | "G" | "D" | "A" | "E" | "B" | "F#" | "Db" | "Ab" | "Eb" | "Bb" | "F"
@@ -17,6 +18,7 @@ export type TrainerSettings = {
   volume: number;
   metronomeEnabled: boolean;
   flowBpm: number;
+  adaptiveFlowBpm: boolean;
   keySignature: KeySignature;
   accidentalsEnabled: boolean;
   midiInputId: string;

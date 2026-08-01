@@ -42,6 +42,30 @@ html[data-theme="light"] {
 
 * {
   box-sizing: border-box;
+  scrollbar-color: color-mix(in srgb, var(--accent) 42%, var(--surface-elevated)) transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 28%, var(--surface-elevated));
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 48%, var(--surface-elevated));
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 html {
@@ -95,12 +119,13 @@ kbd {
   height: 72px;
   justify-content: space-between;
   padding: 0 32px;
+  position: relative;
 }
 
 .brand {
   align-items: center;
   display: flex;
-  font-size: 0.95rem;
+  font-size: 1.12rem;
   font-weight: 650;
   gap: 10px;
   letter-spacing: -0.02em;
@@ -113,11 +138,39 @@ kbd {
   color: var(--accent-ink);
   display: inline-flex;
   font-family: Georgia, serif;
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-style: italic;
-  height: 29px;
+  height: 33px;
   justify-content: center;
-  width: 29px;
+  width: 33px;
+}
+
+.tool-nav {
+  align-items: center;
+  background: var(--soft-fill);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  display: flex;
+  left: 50%;
+  padding: 3px;
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.tool-nav button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 8px 13px;
+}
+
+.tool-nav button.is-active {
+  background: var(--surface-elevated);
+  box-shadow: 0 2px 10px var(--shadow);
+  color: var(--text);
 }
 
 .top-actions {
@@ -400,7 +453,7 @@ kbd {
 .eyebrow {
   color: var(--accent);
   font-family: var(--font-geist-mono), monospace;
-  font-size: 0.68rem;
+  font-size: 0.79rem;
   font-weight: 650;
   letter-spacing: 0.14em;
   margin: 0 0 8px;
@@ -507,6 +560,14 @@ kbd {
 
 .flow-staff {
   cursor: crosshair;
+}
+
+.placement-staff {
+  cursor: crosshair;
+}
+
+.free-play-staff {
+  cursor: default;
 }
 
 .feedback-line {
@@ -684,6 +745,10 @@ kbd {
   width: 100%;
 }
 
+.launch-menu {
+  max-width: 920px;
+}
+
 .settings-heading {
   align-items: start;
   display: flex;
@@ -697,6 +762,45 @@ kbd {
   font-weight: 520;
   letter-spacing: -0.035em;
   margin: 0;
+}
+
+.tool-picker {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 22px;
+}
+
+.tool-picker button {
+  align-items: start;
+  background: var(--soft-fill);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 15px;
+  text-align: left;
+}
+
+.tool-picker button:hover,
+.tool-picker button.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+}
+
+.tool-picker button.is-selected {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.tool-picker strong {
+  font-size: 0.94rem;
+}
+
+.tool-picker span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .key-button {
@@ -758,6 +862,18 @@ kbd {
   max-width: 220px;
   min-width: 155px;
   padding: 8px 30px 8px 10px;
+}
+
+.bpm-number-row input {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-family: var(--font-geist-mono), monospace;
+  padding: 8px 10px;
+  text-align: right;
+  width: 92px;
 }
 
 .setting-row select:focus-visible,
@@ -890,6 +1006,20 @@ kbd {
   text-align: right;
 }
 
+.shortcut-note {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.5;
+  margin: 20px 0 0;
+}
+
+.launch-button {
+  display: flex;
+  font-size: 0.96rem;
+  margin: 24px 0 0 auto;
+  min-width: 150px;
+}
+
 .pause-overlay {
   z-index: 15;
 }
@@ -964,6 +1094,14 @@ kbd {
   color: inherit;
 }
 
+.free-stage {
+  max-width: 1120px;
+}
+
+.free-card {
+  margin-top: 4px;
+}
+
 @media (max-width: 1080px) {
   .workspace-layout {
     grid-template-columns: 225px minmax(0, 1fr);
@@ -977,6 +1115,13 @@ kbd {
   .practice-stage {
     padding-left: 20px;
     padding-right: 20px;
+  }
+
+  .tool-nav {
+    left: auto;
+    margin-left: 18px;
+    position: static;
+    transform: none;
   }
 }
 
@@ -1027,6 +1172,19 @@ kbd {
   .topbar {
     height: auto;
     padding: 16px 18px;
+  }
+
+  .brand > span:last-child {
+    display: none;
+  }
+
+  .tool-nav {
+    margin-left: 0;
+  }
+
+  .tool-nav button {
+    font-size: 0.7rem;
+    padding: 7px 8px;
   }
 
   .status-pill {
@@ -1083,6 +1241,10 @@ kbd {
   }
 
   .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tool-picker {
     grid-template-columns: 1fr;
   }
 

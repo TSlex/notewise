@@ -41,13 +41,15 @@ test("server-renders the Notewise practice shell", async () => {
 });
 
 test("keeps the training capabilities in separate modules", async () => {
-  const [midi, audio, trainer, app, flow, history, settings, notation, launcher, css, packageJson] =
+  const [midi, audio, trainer, app, flow, freePlay, placement, history, settings, notation, launcher, css, packageJson] =
     await Promise.all([
     readFile(new URL("../app/hooks/useMidi.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/audioEngine.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/trainers/noteReading.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/PracticeApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/FlowStaff.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/FreePlayStaff.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/PlacementStaff.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/sessionHistory.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/SettingsMenu.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/drawNotation.ts", import.meta.url), "utf8"),
@@ -72,7 +74,12 @@ test("keeps the training capabilities in separate modules", async () => {
   assert.match(trainer, /displayAccidental/);
   assert.match(app, /nextAttempt === 2/);
   assert.match(app, /MIN_FLOW_BPM/);
+  assert.match(app, /MIN_FLOW_BPM = 1/);
   assert.match(app, /MAX_FLOW_BPM/);
+  assert.match(app, /adaptiveFlowBpm/);
+  assert.match(app, /recognitionTotalMs/);
+  assert.match(app, /event\.code === "KeyT"/);
+  assert.match(app, /tool === "training"/);
   assert.match(app, /flowWindowRef\.current\.length === 5/);
   assert.match(app, /hydratedRef\.current/);
   assert.match(app, /delay:\s*480/);
@@ -80,10 +87,18 @@ test("keeps the training capabilities in separate modules", async () => {
   assert.match(flow, /onTimeout/);
   assert.match(flow, /questions\.slice\(0, 5\)/);
   assert.doesNotMatch(flow, /const settled/);
+  assert.match(freePlay, /PlayedNote/);
+  assert.match(freePlay, /requestAnimationFrame/);
+  assert.match(placement, /getDiatonicIndexAtY/);
+  assert.match(placement, /onPointerMove/);
   assert.match(history, /localStorage/);
   assert.match(history, /MAX_SESSIONS = 20/);
   assert.match(history, /notewise\.session-count\.v1/);
   assert.match(settings, /Чтение на скорость/);
+  assert.match(settings, /Расстановка нот/);
+  assert.match(settings, /Фиксированный BPM/);
+  assert.match(settings, /min="1" max="200" step="1"/);
+  assert.match(settings, /Свободный режим/);
   assert.match(settings, /Громкость/);
   assert.match(settings, /<select/);
   assert.match(settings, /Альтерации вне тональности/);
@@ -93,6 +108,7 @@ test("keeps the training capabilities in separate modules", async () => {
   assert.match(launcher, /3000\.\.3010/);
   assert.match(launcher, /PORT_FILE/);
   assert.match(css, /html\[data-theme="light"\]/);
+  assert.match(css, /scrollbar-color/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 
   await access(new URL("../public/og.png", import.meta.url));

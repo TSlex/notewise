@@ -24,6 +24,7 @@ export type SessionRecord = {
   keySignature?: KeySignature;
   finalBpm?: number;
   finalFlowDurationMs?: number;
+  averageRecognitionMs?: number;
 };
 
 export function loadSessionHistory(): SessionRecord[] {
