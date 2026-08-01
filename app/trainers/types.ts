@@ -8,6 +8,7 @@ export type ThemeMode = "dark" | "light" | "lilac" | "sky" | "orange";
 export type NoteDuration = "whole" | "half" | "quarter" | "eighth" | "sixteenth";
 export type OscillatorWaveform = "sine" | "triangle" | "square" | "sawtooth";
 export type SynthPreset = "clean" | "soft-keys" | "organ" | "synth-lead" | "custom";
+export type AudioLatencyMode = "interactive" | "balanced" | "playback";
 export type KeySignature =
   | "C" | "G" | "D" | "A" | "E" | "B" | "F#" | "Db" | "Ab" | "Eb" | "Bb" | "F"
   | "Am" | "Em" | "Bm" | "F#m" | "C#m" | "G#m" | "D#m" | "Bbm" | "Fm" | "Cm" | "Gm" | "Dm";
@@ -33,6 +34,7 @@ export type TrainerSettings = {
   decay: number;
   sustain: number;
   release: number;
+  audioLatency: AudioLatencyMode;
 };
 
 export type NoteQuestion = {

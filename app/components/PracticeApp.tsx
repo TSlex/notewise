@@ -43,6 +43,7 @@ const DEFAULT_SETTINGS: TrainerSettings = {
   decay: 0.092,
   sustain: 0.57,
   release: 0.12,
+  audioLatency: "balanced",
 };
 
 type FeedbackState = "waiting" | "correct" | "wrong" | "revealed";
@@ -77,6 +78,7 @@ function loadSettings(): TrainerSettings {
     if (!["whole", "half", "quarter", "eighth", "sixteenth"].includes(merged.noteDuration)) merged.noteDuration = "quarter";
     if (!["sine", "triangle", "square", "sawtooth"].includes(merged.waveform)) merged.waveform = "triangle";
     if (!["clean", "soft-keys", "organ", "synth-lead", "custom"].includes(merged.synthPreset)) merged.synthPreset = "clean";
+    if (!["interactive", "balanced", "playback"].includes(merged.audioLatency)) merged.audioLatency = "balanced";
     merged.flowBpm = Math.max(MIN_FLOW_BPM, Math.min(MAX_FLOW_BPM, Number(merged.flowBpm) || 72));
     merged.adaptiveFlowBpm = merged.adaptiveFlowBpm !== false;
     merged.attack = Math.max(0.005, Math.min(2, Number(merged.attack) || DEFAULT_SETTINGS.attack));
@@ -124,6 +126,7 @@ export function PracticeApp() {
   const [history, setHistory] = useState<SessionRecord[]>([]);
   const [totalSessions, setTotalSessions] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsPage, setSettingsPage] = useState<"main" | "sound">("main");
   const [paused, setPaused] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [flowBpm, setFlowBpm] = useState(DEFAULT_SETTINGS.flowBpm);
@@ -154,6 +157,15 @@ export function PracticeApp() {
     statsRef.current = next;
     setStats(next);
     return next;
+  }, []);
+
+  const syncFlowBpm = useCallback((nextBpm: number) => {
+    const bounded = Math.max(MIN_FLOW_BPM, Math.min(MAX_FLOW_BPM, nextBpm));
+    flowBpmRef.current = bounded;
+    setFlowBpm(bounded);
+    const nextSettings = { ...settingsRef.current, flowBpm: bounded };
+    settingsRef.current = nextSettings;
+    setSettings(nextSettings);
   }, []);
 
   const archiveSession = useCallback((statsOverride?: SessionStats) => {
@@ -311,8 +323,7 @@ export function PracticeApp() {
         const nextBpm = correctCount >= 4
           ? Math.min(MAX_FLOW_BPM, flowBpmRef.current + FLOW_STEP_BPM)
           : correctCount <= 2 ? Math.max(MIN_FLOW_BPM, flowBpmRef.current - FLOW_STEP_BPM) : flowBpmRef.current;
-        flowBpmRef.current = nextBpm;
-        setFlowBpm(nextBpm);
+        syncFlowBpm(nextBpm);
       }
       flowWindowRef.current = [];
     }
@@ -334,7 +345,7 @@ export function PracticeApp() {
     })();
     flowQueueRef.current = nextQueue;
     setFlowQueue(nextQueue);
-  }, [archiveSession, completed, launchOpen, paused, settingsOpen, updateStats]);
+  }, [archiveSession, completed, launchOpen, paused, settingsOpen, syncFlowBpm, updateStats]);
 
   const submitNote = useCallback((midiNote: number) => {
     if (toolRef.current !== "training" || settingsRef.current.practiceMode === "placement" || blockedRef.current || paused || settingsOpen || launchOpen || completed) return;
@@ -377,13 +388,13 @@ export function PracticeApp() {
     const letterIndex = ((diatonicIndex % 7) + 7) % 7;
     const octave = Math.floor(diatonicIndex / 7);
     const placedMidi = Math.max(0, Math.min(127, (octave + 1) * 12 + NATURAL_PITCH_CLASSES[letterIndex] + target.accidental));
-    if (settingsRef.current.soundEnabled) void audioRef.current?.preview(placedMidi);
+    if (settingsRef.current.soundEnabled) void audioRef.current?.preview(placedMidi, 0.14);
     const recognitionMs = Math.max(0, readElapsed() - questionStartedElapsedRef.current);
     setPlacedIndex(diatonicIndex);
     if (correct) {
       const firstTry = attemptRef.current === 0;
       setFeedback("correct"); setFeedbackText(firstTry ? "Верно" : "Получилось");
-      settleQuestion({ delay: 650, correct: true, firstTry, recognitionMs });
+      settleQuestion({ delay: 140, correct: true, firstTry, recognitionMs });
       return;
     }
     const nextAttempt = attemptRef.current + 1;
@@ -392,10 +403,10 @@ export function PracticeApp() {
     setFeedback("wrong");
     if (nextAttempt >= 3) {
       setFeedback("revealed"); setFeedbackText(`Правильное положение: ${formatNoteName(target)}`);
-      settleQuestion({ delay: 1900, correct: false, firstTry: false, recognitionMs });
+      settleQuestion({ delay: 900, correct: false, firstTry: false, recognitionMs });
     } else {
       setFeedbackText(nextAttempt === 1 ? "Не здесь. Попробуй ещё" : "Ещё одна попытка");
-      feedbackTimerRef.current = setTimeout(() => { setPlacedIndex(null); setFeedback("waiting"); setFeedbackText(`Поставь на стан: ${formatNoteName(target)}`); }, 520);
+      feedbackTimerRef.current = setTimeout(() => { setPlacedIndex(null); setFeedback("waiting"); setFeedbackText(`Поставь на стан: ${formatNoteName(target)}`); }, 170);
     }
   }, [completed, launchOpen, paused, readElapsed, settingsOpen, settleQuestion, updateStats]);
 
@@ -451,15 +462,20 @@ export function PracticeApp() {
   }, [archiveSession, restartSession]);
 
   const closeMenu = useCallback(() => {
+    audioRef.current?.noteOff(60);
     void audioRef.current?.activate();
     setLaunchOpen(false); setSettingsOpen(false); setPaused(false);
+    setSettingsPage("main");
     if (launchOpen) questionStartedElapsedRef.current = readElapsed();
   }, [launchOpen, readElapsed]);
+
+  const startSoundTest = useCallback(() => { void audioRef.current?.noteOn(60); }, []);
+  const endSoundTest = useCallback(() => { audioRef.current?.noteOff(60); }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (launchOpen || settingsOpen || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return;
-      if (event.code === "Escape") { event.preventDefault(); setSettingsOpen(true); }
+      if (event.code === "Escape") { event.preventDefault(); setSettingsPage("main"); setSettingsOpen(true); }
       if (event.code === "Space") { event.preventDefault(); if (!completed) setPaused((current) => !current); }
       if (event.code === "KeyR") { event.preventDefault(); if (toolRef.current === "training") restartSession(); else setFreeNotes([]); }
       if (event.code === "KeyS") { event.preventDefault(); updateSettings({ ...settingsRef.current, soundEnabled: !settingsRef.current.soundEnabled }); }
@@ -494,7 +510,7 @@ export function PracticeApp() {
   const clefLabel = settings.clefMode === "treble" ? "Скрипичный" : settings.clefMode === "bass" ? "Басовый" : "Большой стан";
   const rangeLabel = settings.range === "octave" ? "1 октава" : settings.range === "octave-half" ? "1½ октавы" : "2 октавы";
   const practiceTitle = settings.practiceMode === "flow" ? "Чтение на скорость" : settings.practiceMode === "placement" ? "Расстановка нот" : "Чтение нот";
-  const adjustFlowBpm = (delta: number) => { const next = Math.max(MIN_FLOW_BPM, Math.min(MAX_FLOW_BPM, flowBpmRef.current + delta)); flowBpmRef.current = next; setFlowBpm(next); };
+  const adjustFlowBpm = (delta: number) => syncFlowBpm(flowBpmRef.current + delta);
   const cycleTheme = () => { const index = THEMES.indexOf(settings.theme); updateSettings({ ...settings, theme: THEMES[(index + 1) % THEMES.length] }); };
 
   return (
@@ -509,7 +525,8 @@ export function PracticeApp() {
           <button className={`status-pill ${midiStatus === "connected" ? "is-connected" : ""}`} onClick={() => { void audioRef.current?.activate(); void connect(); }}><span className="status-dot" />{midiCopy}</button>
           <button className="theme-toggle" onClick={cycleTheme} aria-label="Сменить тему">◐</button>
           <button className={`sound-toggle ${settings.soundEnabled ? "is-on" : ""}`} onClick={() => { void audioRef.current?.activate(); updateSettings({ ...settings, soundEnabled: !settings.soundEnabled }); }} aria-label={settings.soundEnabled ? "Выключить звук приложения" : "Включить звук приложения"}>{settings.soundEnabled ? `Звук ${Math.round(settings.volume * 100)}%` : "Звук выкл."}</button>
-          <button className="menu-trigger" onClick={() => setSettingsOpen(true)}><span>Настройки</span><kbd>Esc</kbd></button>
+          <button className="sound-settings-trigger" onClick={() => { setSettingsPage("sound"); setSettingsOpen(true); }} aria-label="Открыть настройку тембра">Тембр</button>
+          <button className="menu-trigger" onClick={() => { setSettingsPage("main"); setSettingsOpen(true); }}><span>Настройки</span><kbd>Esc</kbd></button>
         </div>
       </header>
 
@@ -545,7 +562,7 @@ export function PracticeApp() {
 
       {paused && !settingsOpen && !launchOpen && !completed && <div className="pause-overlay"><button className="pause-card" onClick={() => setPaused(false)}><span className="pause-symbol">Ⅱ</span><strong>Пауза</strong><small>Space или нажми здесь, чтобы продолжить</small></button></div>}
       {completed && <div className="settings-backdrop"><section className="completion-card" role="dialog" aria-modal="true"><p className="eyebrow">Сессия завершена</p><h2>{accuracy}% точности</h2><p>{stats.answered} нот · {formatDuration(elapsedSeconds)} · лучшая серия {stats.bestStreak}</p><button className="primary-button" onClick={() => restartSession()}>Новая сессия <kbd>R</kbd></button></section></div>}
-      {(launchOpen || settingsOpen) && <SettingsMenu settings={settings} tool={tool} launch={launchOpen} midiDevices={midiDevices} onChange={updateSettings} onToolChange={changeTool} onPreviewSound={() => { if (settings.soundEnabled) void audioRef.current?.preview(60, 0.65); }} onClose={closeMenu} />}
+      {(launchOpen || settingsOpen) && <SettingsMenu settings={settings} tool={tool} launch={launchOpen} midiDevices={midiDevices} onChange={updateSettings} onToolChange={changeTool} initialPage={launchOpen ? "main" : settingsPage} onSoundTestStart={startSoundTest} onSoundTestEnd={endSoundTest} onClose={closeMenu} />}
     </main>
   );
 }

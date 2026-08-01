@@ -241,6 +241,7 @@ kbd {
 
 .status-pill,
 .sound-toggle,
+.sound-settings-trigger,
 .theme-toggle,
 .menu-trigger {
   align-items: center;
@@ -259,6 +260,7 @@ kbd {
 
 .status-pill:hover,
 .sound-toggle:hover,
+.sound-settings-trigger:hover,
 .theme-toggle:hover,
 .menu-trigger:hover {
   background: var(--hover-fill);
@@ -281,6 +283,10 @@ kbd {
 
 .sound-toggle.is-on {
   color: var(--text);
+}
+
+.sound-settings-trigger {
+  color: var(--accent);
 }
 
 .theme-toggle {
@@ -1063,6 +1069,25 @@ kbd {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.envelope-visualizer {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent 55%),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: block;
+  height: 180px;
+  margin-bottom: 14px;
+  width: 100%;
+}
+
+.sound-buffer-note {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+  margin: 14px 4px 0;
+}
+
 .sound-designer-actions {
   display: flex;
   gap: 12px;
@@ -1081,6 +1106,19 @@ kbd {
 
 .secondary-button:hover {
   border-color: var(--accent);
+}
+
+.sound-test-key {
+  min-width: 190px;
+  touch-action: none;
+  transition: background 80ms ease, border-color 80ms ease, transform 80ms ease;
+  user-select: none;
+}
+
+.sound-test-key:active {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border-color: var(--accent);
+  transform: translateY(2px);
 }
 
 .setting-note {
@@ -1137,7 +1175,7 @@ kbd {
 .launch-button {
   display: flex;
   font-size: 0.96rem;
-  margin: 24px 0 0 auto;
+  margin: 0;
   min-width: 150px;
 }
 
@@ -1317,6 +1355,11 @@ kbd {
 
   .sound-toggle {
     display: none;
+  }
+
+  .sound-settings-trigger {
+    font-size: 0.72rem;
+    padding: 0 10px;
   }
 
   .theme-toggle {

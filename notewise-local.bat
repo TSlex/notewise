@@ -21,7 +21,7 @@ if /I "%~1"=="status" (
 )
 if /I "%~1"=="open" (
   call :load_port
-  start "" "http://127.0.0.1:!APP_PORT!"
+  start "" "http://localhost:!APP_PORT!"
   exit /b 0
 )
 if not "%~1"=="" (
@@ -35,7 +35,7 @@ call :load_port
 cls
 echo.
 echo   Notewise — local launcher
-echo   http://127.0.0.1:!APP_PORT!
+echo   http://localhost:!APP_PORT!
 echo.
 echo   [1] Start
 echo   [2] Stop
@@ -47,7 +47,7 @@ choice /c 12345 /n /m "Choose an action"
 if errorlevel 5 exit /b 0
 if errorlevel 4 (
   call :load_port
-  start "" "http://127.0.0.1:!APP_PORT!"
+  start "" "http://localhost:!APP_PORT!"
   goto menu
 )
 if errorlevel 3 (
@@ -70,7 +70,7 @@ if errorlevel 1 (
 call :get_running_pid
 if defined RUNNING_PID (
   call :load_port
-  echo Notewise is already running at http://127.0.0.1:!APP_PORT!
+  echo Notewise is already running at http://localhost:!APP_PORT!
   exit /b 0
 )
 
@@ -108,7 +108,7 @@ if not defined RUNNING_PID (
   exit /b 1
 )
 
-start "" "http://127.0.0.1:!APP_PORT!"
+start "" "http://localhost:!APP_PORT!"
 echo Notewise is running locally. This window can now be closed.
 exit /b 0
 
@@ -136,7 +136,7 @@ exit /b 0
 call :get_running_pid
 if defined RUNNING_PID (
   call :load_port
-  echo Notewise is running locally at http://127.0.0.1:!APP_PORT!
+  echo Notewise is running locally at http://localhost:!APP_PORT!
   exit /b 0
 )
 

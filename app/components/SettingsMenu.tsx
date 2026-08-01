@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import type { MidiDevice } from "../hooks/useMidi";
 import { KEY_SIGNATURES } from "../trainers/noteReading";
+import { EnvelopeVisualizer } from "./EnvelopeVisualizer";
 import type {
+  AudioLatencyMode,
   ClefMode,
   KeySignature,
   NoteDuration,
@@ -24,7 +26,9 @@ type SettingsMenuProps = {
   midiDevices: MidiDevice[];
   onChange: (settings: TrainerSettings) => void;
   onToolChange: (tool: ToolMode) => void;
-  onPreviewSound: () => void;
+  initialPage?: "main" | "sound";
+  onSoundTestStart: () => void;
+  onSoundTestEnd: () => void;
   onClose: () => void;
 };
 
@@ -54,10 +58,12 @@ export function SettingsMenu({
   midiDevices,
   onChange,
   onToolChange,
-  onPreviewSound,
+  initialPage = "main",
+  onSoundTestStart,
+  onSoundTestEnd,
   onClose,
 }: SettingsMenuProps) {
-  const [soundOpen, setSoundOpen] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(initialPage === "sound");
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === "Escape" && !launch) {
@@ -90,7 +96,9 @@ export function SettingsMenu({
             <p className="eyebrow">{launch ? "Добро пожаловать" : "Пауза"}</p>
             <h2 id="settings-title">{launch ? "Выбери инструмент" : "Настройки"}</h2>
           </div>
-          {!launch && <button className="key-button" onClick={onClose} aria-label="Закрыть">Esc</button>}
+          {launch
+            ? <button className="primary-button launch-button" onClick={onClose}>Начать</button>
+            : <button className="key-button" onClick={onClose} aria-label="Закрыть">Esc</button>}
         </div>
 
         <div className="tool-picker" aria-label="Инструмент">
@@ -238,8 +246,9 @@ export function SettingsMenu({
           <div className="sound-designer-page">
             <div className="settings-heading">
               <div><p className="eyebrow">Web Audio синтезатор</p><h2>Настройка звука</h2></div>
-              <button type="button" className="key-button" onClick={() => setSoundOpen(false)} aria-label="Вернуться к настройкам">← Назад</button>
+              <button type="button" className="key-button" onClick={() => { onSoundTestEnd(); setSoundOpen(false); }} aria-label="Вернуться к настройкам">← Назад</button>
             </div>
+            <EnvelopeVisualizer attack={settings.attack} decay={settings.decay} sustain={settings.sustain} release={settings.release} theme={settings.theme} />
             <div className="sound-designer-grid">
               <label className="setting-row">
                 <span>Пресет</span>
@@ -257,6 +266,14 @@ export function SettingsMenu({
                   <option value="sine">Sine</option><option value="triangle">Triangle</option><option value="square">Square</option><option value="sawtooth">Sawtooth</option>
                 </select>
               </label>
+              <label className="setting-row">
+                <span>Буфер аудио</span>
+                <select value={settings.audioLatency} onChange={(event) => set("audioLatency", event.target.value as AudioLatencyMode)}>
+                  <option value="interactive">Минимальный · меньше задержка</option>
+                  <option value="balanced">Сбалансированный</option>
+                  <option value="playback">Устойчивый · меньше треска</option>
+                </select>
+              </label>
               {([
                 ["attack", "Attack", 0.005, 2, 0.005],
                 ["decay", "Decay", 0.01, 2, 0.01],
@@ -269,13 +286,22 @@ export function SettingsMenu({
                 </label>
               ))}
             </div>
+            <p className="sound-buffer-note">Устойчивый режим просит браузер увеличить аудиобуфер. Он уменьшает риск потрескивания, но немного повышает задержку клавиш.</p>
             <div className="sound-designer-actions">
-              <button type="button" className="secondary-button" onClick={onPreviewSound}>Прослушать до первой</button>
-              <button type="button" className="primary-button" onClick={() => setSoundOpen(false)}>Готово</button>
+              <button
+                type="button"
+                className="secondary-button sound-test-key"
+                onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); onSoundTestStart(); }}
+                onPointerUp={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); onSoundTestEnd(); }}
+                onPointerCancel={onSoundTestEnd}
+                onKeyDown={(event) => { if (!event.repeat && (event.code === "Space" || event.code === "Enter")) onSoundTestStart(); }}
+                onKeyUp={(event) => { if (event.code === "Space" || event.code === "Enter") onSoundTestEnd(); }}
+                onBlur={onSoundTestEnd}
+              >Удерживай · до первой</button>
+              <button type="button" className="primary-button" onClick={() => { onSoundTestEnd(); setSoundOpen(false); }}>Готово</button>
             </div>
           </div>
         )}
-        {launch && <button className="primary-button launch-button" onClick={onClose}>Начать</button>}
       </section>
     </div>
   );

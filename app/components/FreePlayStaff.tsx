@@ -5,6 +5,8 @@ import { drawNotation, getStaffMetrics, GRAND_STAFF_HEIGHT, prepareCanvas, SINGL
 import { getDiatonicIndex } from "../trainers/noteReading";
 import type { ClefMode, NoteDuration, NoteQuestion, ThemeMode } from "../trainers/types";
 
+const CHORD_WINDOW_MS = 45;
+
 export type PlayedNote = {
   id: string;
   question: NoteQuestion;
@@ -72,7 +74,7 @@ export function FreePlayStaff({
           .sort((a, b) => a.startedAt - b.startedAt)
           .forEach((note) => {
             const group = groups[groups.length - 1];
-            if (group && group[0].question.clef === note.question.clef && note.startedAt - group[0].startedAt <= 110) group.push(note);
+            if (group && group[0].question.clef === note.question.clef && note.startedAt - group[0].startedAt <= CHORD_WINDOW_MS) group.push(note);
             else groups.push([note]);
           });
 

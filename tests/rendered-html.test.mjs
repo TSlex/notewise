@@ -41,7 +41,7 @@ test("server-renders the Notewise practice shell", async () => {
 });
 
 test("keeps the training capabilities in separate modules", async () => {
-  const [midi, audio, trainer, app, flow, freePlay, placement, history, settings, notation, launcher, css, packageJson] =
+  const [midi, audio, trainer, app, flow, freePlay, placement, history, settings, envelope, notation, launcher, css, packageJson] =
     await Promise.all([
     readFile(new URL("../app/hooks/useMidi.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/audioEngine.ts", import.meta.url), "utf8"),
@@ -52,6 +52,7 @@ test("keeps the training capabilities in separate modules", async () => {
     readFile(new URL("../app/components/PlacementStaff.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/sessionHistory.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/SettingsMenu.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/EnvelopeVisualizer.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/drawNotation.ts", import.meta.url), "utf8"),
     readFile(new URL("../notewise-local.bat", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -70,6 +71,8 @@ test("keeps the training capabilities in separate modules", async () => {
   assert.match(audio, /metronomeTick/);
   assert.match(audio, /setSound/);
   assert.match(audio, /this\.sound\.attack/);
+  assert.match(audio, /createDynamicsCompressor/);
+  assert.match(audio, /latencyHint/);
   assert.match(trainer, /createQuestion/);
   assert.match(trainer, /isCorrect/);
   assert.match(trainer, /KEY_SIGNATURES/);
@@ -91,7 +94,7 @@ test("keeps the training capabilities in separate modules", async () => {
   assert.doesNotMatch(flow, /const settled/);
   assert.match(freePlay, /PlayedNote/);
   assert.match(freePlay, /requestAnimationFrame/);
-  assert.match(freePlay, /startedAt - group\[0\]\.startedAt <= 110/);
+  assert.match(freePlay, /CHORD_WINDOW_MS = 45/);
   assert.match(placement, /getDiatonicIndexAtY/);
   assert.match(placement, /onPointerMove/);
   assert.match(history, /localStorage/);
@@ -108,9 +111,14 @@ test("keeps the training capabilities in separate modules", async () => {
   assert.match(settings, /MIDI-вход/);
   assert.match(settings, /Настройка звука/);
   assert.match(settings, /Шестнадцатая/);
+  assert.match(settings, /Удерживай · до первой/);
+  assert.match(settings, /Устойчивый · меньше треска/);
+  assert.match(envelope, /createLinearGradient/);
+  assert.match(envelope, /Огибающая/);
   assert.match(notation, /KEY_SIGNATURES/);
   assert.match(notation, /displayAccidental/);
   assert.match(launcher, /8200\.\.8210/);
+  assert.match(launcher, /http:\/\/localhost:!APP_PORT!/);
   assert.match(launcher, /PORT_FILE/);
   assert.match(css, /html\[data-theme="light"\]/);
   assert.match(css, /html\[data-theme="lilac"\]/);
